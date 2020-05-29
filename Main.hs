@@ -13,7 +13,87 @@ class Eval e where
 class Conditional e where
   ifZero :: Number -> e -> e -> e
 
+data Expr :: * -> * where
+  ExpNumber :: Double -> Expr t
+  ExpRadian :: Radian -> Expr t
+  ExpCos    :: t -> Expr t
+  ExpSin    :: t -> Expr t
+  ExpSqrt   :: t -> Expr t
+  ExpAdd    :: t -> t -> Expr t
+  ExpSub    :: t -> t -> Expr t
+  ExpMul    :: t -> t -> Expr t
+  ExpDiv    :: t -> t -> Expr t
+  ExpPower  :: t -> t -> Expr t
+  ExpIfZero :: t -> t -> t -> Expr t    
+
+newtype Mu a = Mu (a (Mu a))
+
+instance Show (Mu Expr) where
+  showsPrec d (Mu (ExpNumber n)) = shows n
+  showsPrec d (Mu (ExpRadian r)) = showsPrec d r
+  showsPrec d (Mu (ExpSin t)) = showParen (d > 10) $
+      showString "sin " . showsPrec 11 t
+  showsPrec d (Mu (ExpCos t)) = showParen (d > 10) $
+      showString "cos " . showsPrec 11 t
+  showsPrec d (Mu (ExpSqrt t)) = showParen (d > 10) $
+      showString "sqrt " . showsPrec 11 t
+  showsPrec d (Mu (ExpAdd n1 n2)) = showParen (d > 6) $
+      showsPrec 7 n1  .
+      showString " + " .
+      showsPrec 7 n2 
+  showsPrec d (Mu (ExpSub n1 n2)) = showParen (d > 6) $
+      showsPrec 7 n1  .
+      showString " - " .
+      showsPrec 7 n2 
+  showsPrec d (Mu (ExpMul n1 n2)) = showParen (d > 7) $
+      showsPrec 8 n1  .
+      showString " * " .
+      showsPrec 8 n2 
+  showsPrec d (Mu (ExpDiv n1 n2)) = showParen (d > 7) $
+      showsPrec 8 n1  .
+      showString " / " .
+      showsPrec 8 n2 
+  showsPrec d (Mu (ExpPower n1 n2)) = showParen (d > 8) $
+      showsPrec 9 n1  .
+      showString " ^ " .
+      showsPrec 9 n2
+  showsPrec d (Mu (ExpIfZero a b c)) = showParen (d > 10) $
+      showString "ifZero " .
+      showsPrec 11 a .
+      showString " " .
+      showsPrec 11 b .
+      showString " " .
+      showsPrec 11 c
+      
+newtype Scalar where
+  Scalar :: Mu Expr -> Scalar
+
+instance Show Scalar where
+  showsPrec d (Scalar e) = showsPrec d e
+
+instance Num Scalar where
+  Scalar a + Scalar b = Scalar (Mu $ ExpAdd a b)
+  Scalar a - Scalar b = Scalar (Mu $ ExpSub a b)
+  Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
+  fromInteger = Scalar . Mu . ExpNumber . fromInteger
   
+instance Fractional Scalar where
+  Scalar a / Scalar b = Scalar (Mu $ ExpDiv a b)
+  fromRational = Scalar . Mu . ExpNumber . fromRational  
+
+instance Floating Number where
+  sqrt (Scalar n) = Scalar (Mu $ ExpSqrt n)
+
+instance Conditional Number where
+  ifZero (Scalar a) (Scalar b) (Scalar c) = Scalar $ Mu $ ExpIfZero a b c
+
+infixr 8 ^
+
+Scalar a ^ Scalar b = Scalar (Mu $ ExpPower a b)
+
+type Number = Scalar
+
+{-
 -- Sometimes, they are just floating point values
 -- Perhaps use Scalar?
 data Number where
@@ -57,10 +137,7 @@ instance Eval Number where
 
 instance Conditional Number where
   ifZero = NumIfZero
-
-infixr 8 ^
-
-(^) = Power
+-}
 
 -- Expressions can be radians
 data Radian where
@@ -68,7 +145,7 @@ data Radian where
   Atan2 :: Number -> Number -> Radian
   RadAdd :: Radian -> Radian -> Radian
   RadSub :: Radian -> Radian -> Radian
-  deriving (Eq, Show)
+  deriving (Show)
 
 instance Num Radian where
   Radian r1 + Radian r2 = Radian (r1 + r2)
@@ -80,10 +157,12 @@ instance Num Radian where
 instance Fractional Radian where
   fromRational = Radian  . fromRational
 
+{-
 instance Eval Radian where
   eval _   (Radian n) = Number n
   eval env (Atan2 y x) = case (eval env y, eval env x) of
     (Number n, Number m) -> Number (P.atan2 n m)
+-}
 
 class Math radian where
   sin :: radian -> Number
@@ -91,12 +170,12 @@ class Math radian where
   atan2 :: Number -> Number -> radian
 
 instance Math Radian where
-  cos r = Cos r
-  sin r = Sin r
+  cos = Scalar . Mu . ExpCos . Mu . ExpRadian
+  sin  = Scalar . Mu . ExpSin . Mu . ExpRadian
   atan2 y x = Atan2 y x
     
 newtype Longitude = Longitude Radian
-  deriving (Eq, Show)
+  deriving (Show)
 
 instance Num Longitude where
   Longitude a + Longitude b = Longitude (a + b)
@@ -108,7 +187,7 @@ instance Fractional Longitude where
   fromRational = Longitude . fromRational
 
 newtype Latitude = Latitude Radian
-  deriving (Eq, Show)
+  deriving (Show)
 
 instance Num Latitude where
   fromInteger = Latitude . fromInteger 
@@ -186,7 +265,7 @@ toRecilinear (phi_1,lam_0) (phi,lam) = Rectilinear x y
 --ifZero = undefined
 
 ------------------------------------------------------------------------------
-
+{-
 newtype Formula a = Formula a
 
 instance Show (Formula Number) where
@@ -249,3 +328,4 @@ instance Show (Formula Rectilinear) where
       showString " " .
       showsPrec 11 (Formula n2)
 
+-}
