@@ -1,8 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Main where
+
+import Data.Reify
 
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
@@ -15,7 +19,6 @@ class Conditional e where
 
 data Expr :: * -> * where
   ExpNumber :: Double -> Expr t
-  ExpRadian :: Radian -> Expr t
   ExpCos    :: t -> Expr t
   ExpSin    :: t -> Expr t
   ExpSqrt   :: t -> Expr t
@@ -24,13 +27,25 @@ data Expr :: * -> * where
   ExpMul    :: t -> t -> Expr t
   ExpDiv    :: t -> t -> Expr t
   ExpPower  :: t -> t -> Expr t
+  ExpAtan2  :: t -> t -> Expr t  
   ExpIfZero :: t -> t -> t -> Expr t    
+
+deriving instance Show t => Show (Expr t)
+
+instance Functor Expr where
+  fmap f (ExpNumber d) = ExpNumber d
+  fmap f g = error "fmap"
+instance Foldable Expr where
+  foldr f z (ExpNumber d) = z
+  foldr f z _ = error "foldr"
+instance Traversable Expr where
+  traverse f (ExpNumber d) = pure $ ExpNumber d
+  traverse _ _ = error "traverse"
 
 newtype Mu a = Mu (a (Mu a))
 
 instance Show (Mu Expr) where
   showsPrec d (Mu (ExpNumber n)) = shows n
-  showsPrec d (Mu (ExpRadian r)) = showsPrec d r
   showsPrec d (Mu (ExpSin t)) = showParen (d > 10) $
       showString "sin " . showsPrec 11 t
   showsPrec d (Mu (ExpCos t)) = showParen (d > 10) $
@@ -140,22 +155,26 @@ instance Conditional Number where
 -}
 
 -- Expressions can be radians
+newtype Radian where
+  Radian :: Mu Expr -> Radian
+{-
 data Radian where
   Radian :: Double -> Radian
   Atan2 :: Number -> Number -> Radian
   RadAdd :: Radian -> Radian -> Radian
   RadSub :: Radian -> Radian -> Radian
   deriving (Show)
-
+-}
+instance Show Radian where
+  showsPrec d (Radian e) = showsPrec d e
+  
 instance Num Radian where
-  Radian r1 + Radian r2 = Radian (r1 + r2)
-  r1 + r2 = RadAdd r1 r2
-  Radian r1 - Radian r2 = Radian (r1 - r2)
-  r1 - r2 = RadSub r1 r2
-  fromInteger = Radian  . fromInteger
+  Radian r1 + Radian r2 = Radian $ Mu $ ExpAdd r1 r2
+  Radian r1 - Radian r2 = Radian $ Mu $ ExpSub r1 r2
+  fromInteger = Radian . Mu . ExpNumber . fromInteger
 
 instance Fractional Radian where
-  fromRational = Radian  . fromRational
+  fromRational = Radian . Mu . ExpNumber . fromRational
 
 {-
 instance Eval Radian where
@@ -170,9 +189,9 @@ class Math radian where
   atan2 :: Number -> Number -> radian
 
 instance Math Radian where
-  cos = Scalar . Mu . ExpCos . Mu . ExpRadian
-  sin  = Scalar . Mu . ExpSin . Mu . ExpRadian
-  atan2 y x = Atan2 y x
+  sin (Radian r) = Scalar $ Mu $ ExpSin r
+  cos (Radian r) = Scalar $ Mu $ ExpCos r
+  atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
     
 newtype Longitude = Longitude Radian
   deriving (Show)
@@ -329,3 +348,14 @@ instance Show (Formula Rectilinear) where
       showsPrec 11 (Formula n2)
 
 -}
+
+------------------------------------------------------------------------------
+
+instance MuRef Scalar where
+  type DeRef Scalar = Expr
+  mapDeRef f (Scalar s) =  mapDeRef f s
+
+instance MuRef (Mu Expr) where
+  type DeRef (Mu Expr) = Expr
+  mapDeRef f (Mu e) = traverse f e --  pure (ExpNumber d)  
+--  mapDeRef f (Mu (ExpNumber d)) = traverse f e --  pure (ExpNumber d)
