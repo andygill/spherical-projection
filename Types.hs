@@ -70,6 +70,9 @@ instance Math Radian where
   cos (Radian r) = Scalar $ Mu $ ExpCos r
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
     
+instance Var Radian where
+  mkVar' = VarGen $ \ i -> (Radian . Mu . ExpVar $ i , succ i)
+
 -- Sometimes called elevation
 newtype Longitude = Longitude Radian
   deriving (Show)
@@ -131,6 +134,10 @@ pointToLatLong (x,y,z)  = (long,lat)
 data Rectilinear = Rectilinear Scalar Scalar
   deriving Show
 
+instance Conditional Rectilinear where
+  ifZero s (Rectilinear a b) (Rectilinear c d) =
+    Rectilinear (ifZero s a c) (ifZero s b d)
+
 instance MuRef Rectilinear where
   type DeRef Rectilinear = Expr
   mapDeRef f (Rectilinear (Scalar x) (Scalar y)) =
@@ -141,12 +148,12 @@ fromRecilinear :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
 fromRecilinear = undefined
 
 toRecilinear :: (Latitude, Longitude) -> (Latitude, Longitude) -> Rectilinear
-toRecilinear (phi_1,lam_0) (phi,lam) = Rectilinear x y
+toRecilinear (phi_1,lam_0) (phi,lam) = ifZero cos_c (Rectilinear 0 0)
+                                     $ Rectilinear x y
   where
     cos_c = sin(phi_1) * sin(phi) + cos(phi_1) * cos(phi) * cos (lam - lam_0);
-    x = ifZero cos_c 0 $ cos(phi) * sin (lam - lam_0) / cos_c
-    y = ifZero cos_c 0 $
-          (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
+    x = cos(phi) * sin (lam - lam_0) / cos_c
+    y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
 ------------------------------------------------------------------------------
 
@@ -155,7 +162,7 @@ instance MuRef Scalar where
   mapDeRef f (Scalar s) = mapDeRef f s
 
 instance Var Scalar where
-  mkVar = Scalar . Mu . ExpVar
+  mkVar i = (Scalar . Mu . ExpVar $ i , [i])
 
 instance Body Scalar where
   maxVar (Scalar e) = maxVar e
@@ -163,3 +170,13 @@ instance Body Scalar where
 evalScalar :: Scalar -> Value
 evalScalar (Scalar e) = evalMu e
 
+instance Var Latitude where
+  mkVar i = (Latitude . Radian . Mu . ExpVar $ i , [i])
+  mkVar' = Latitude <$> mkVar'
+
+instance Var Longitude where
+  mkVar i = (Longitude . Radian . Mu . ExpVar $ i , [i])
+  mkVar' = Longitude <$> mkVar'
+  
+instance Body Rectilinear where
+  maxVar (Rectilinear a b) = maxVar a `max` maxVar b

@@ -10,6 +10,7 @@ import Data.Dynamic
 import Data.Reify
 import Debug.Trace
 import Data.Maybe
+import Control.Applicative
 
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
@@ -25,7 +26,7 @@ data Expr :: * -> * where
   ExpDiv    :: t -> t -> Expr t
   ExpPower  :: t -> t -> Expr t
   ExpAtan2  :: t -> t -> Expr t
-  ExpLambda :: Int -> t -> Expr t
+  ExpLambda :: [Int] -> t -> Expr t
   ExpVar    :: Int -> Expr t
   ExpRectilinear :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t    
@@ -43,7 +44,11 @@ instance Functor Expr where
   fmap f (ExpDiv t1 t2) = ExpDiv (f t1) (f t2)
   fmap f (ExpPower t1 t2) = ExpPower (f t1) (f t2)
   fmap f (ExpAtan2 t1 t2) = ExpAtan2 (f t1) (f t2)
-  fmap f g = error "fmap"
+  fmap f (ExpLambda vs t) = ExpLambda vs (f t)
+  fmap f (ExpVar i) = ExpVar i
+  fmap f (ExpRectilinear t1 t2) = ExpRectilinear (f t1) (f t2)
+  fmap f (ExpIfZero t1 t2 t3) = ExpIfZero (f t1) (f t2) (f t3)
+  fmap f g = error $ show ("fmap" )
 instance Foldable Expr where
   foldr f z (ExpScalar d) = z
   foldr f z (ExpSin t1) = f t1 z
@@ -55,6 +60,7 @@ instance Foldable Expr where
   foldr f z (ExpDiv t1 t2) = f t1 (f t2 z)
   foldr f z (ExpPower t1 t2) = f t1 (f t2 z)
   foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
   foldr f z _ = error "foldr"
 instance Traversable Expr where
   traverse f (ExpScalar d) = pure $ ExpScalar d
@@ -115,7 +121,19 @@ instance MuRef (Mu Expr) where
   mapDeRef f (Mu e) = traverse f e 
 
 class Var a where
-  mkVar :: Int -> a
+  mkVar :: Int -> (a,[Int])
+  mkVar' :: VarGen a
+
+data VarGen a = VarGen { runVarGen :: Int -> (a,Int) }
+
+instance Functor VarGen where
+  fmap f g = pure f <*> g
+    
+instance Applicative VarGen where
+  pure a = VarGen $ \ n -> (a,n)
+  VarGen f <*> VarGen g = VarGen $ \ n -> case f n of
+    (a,n') -> case g n' of
+      (b,n'') -> (a b,n'')
 
 class Body a where
   maxVar :: a -> Int
@@ -123,23 +141,24 @@ class Body a where
 instance (Var a, Body b, MuRef b, DeRef b ~ Expr) =>
     MuRef (a -> b) where
   type DeRef (a -> b) = Expr
-  mapDeRef f fn = ExpLambda n <$> f r
+  mapDeRef f fn = ExpLambda ns <$> f r
     where
-      (n,r) = maxApp fn
+      (ns,r) = maxApp fn
 
-maxApp :: (Body b, Var t) => (t -> b) -> (Int, b)
-maxApp fn = traceShow ("maxapp",n) (n,r)
+maxApp :: (Body b, Var t) => (t -> b) -> ([Int], b)
+maxApp fn = traceShow ("maxapp",n) ([n..n' - 1],r)
     where
-      n = maxVar r + 1
-      r = fn (mkVar n)
+      n      = maxVar r + 1
+      (v,n') = runVarGen mkVar' n
+      r      = fn v
 
 instance (Var a, Body b) => Body (a -> b) where
-  maxVar = fst . maxApp 
+  maxVar = maximum . fst . maxApp 
 
 instance Body (Mu Expr) where
   maxVar (Mu e) = case e of
     ExpVar i      -> 0
-    ExpLambda i e -> i  -- This short-cut is vital to avoid 
+--    ExpLambda i e -> i  -- This short-cut is vital to avoid 
     other -> foldr (+) 0 $ fmap maxVar other
 
 class Eval e where
@@ -172,3 +191,11 @@ evalGraph (Graph xs u) = find u
     find :: Unique -> Value
     find n = fromMaybe (error (show n ++ " not found")) $
              lookup n es
+
+instance (Var a, Var b) => Var (a,b) where
+  mkVar n = ((v1,v2),ns1 ++ ns2)
+    where
+      (v1,ns1) = mkVar n
+      (v2,ns2) = mkVar (maximum ns1 + 1)
+
+  mkVar' = liftA2 (,) mkVar' mkVar'
