@@ -6,40 +6,77 @@
 
 module Main where
 
+import Data.Dynamic
 import Data.Reify
+import Debug.Trace
 
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
 
-class Eval e where
-  eval :: () -> e -> Number
+--class Eval e where
+--  eval :: () -> e -> Number
 
 class Conditional e where
   ifZero :: Number -> e -> e -> e
 
 data Expr :: * -> * where
   ExpNumber :: Double -> Expr t
-  ExpCos    :: t -> Expr t
   ExpSin    :: t -> Expr t
+  ExpCos    :: t -> Expr t
   ExpSqrt   :: t -> Expr t
   ExpAdd    :: t -> t -> Expr t
   ExpSub    :: t -> t -> Expr t
   ExpMul    :: t -> t -> Expr t
   ExpDiv    :: t -> t -> Expr t
   ExpPower  :: t -> t -> Expr t
-  ExpAtan2  :: t -> t -> Expr t  
+  ExpAtan2  :: t -> t -> Expr t
+  ExpLambda :: Int -> t -> Expr t
+  ExpVar    :: Int -> Expr t
+  ExpLambda' :: t -> t -> Expr t
+  ExpVar'   :: Dynamic -> Expr t
+  ExpRectilinear :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t    
 
 deriving instance Show t => Show (Expr t)
 
 instance Functor Expr where
   fmap f (ExpNumber d) = ExpNumber d
+  fmap f (ExpSin t1) = ExpSin (f t1)
+  fmap f (ExpCos t1) = ExpCos (f t1)
+  fmap f (ExpSqrt t1) = ExpSqrt (f t1)
+  fmap f (ExpAdd t1 t2) = ExpAdd (f t1) (f t2)
+  fmap f (ExpSub t1 t2) = ExpSub (f t1) (f t2)
+  fmap f (ExpMul t1 t2) = ExpMul (f t1) (f t2)
+  fmap f (ExpDiv t1 t2) = ExpDiv (f t1) (f t2)
+  fmap f (ExpPower t1 t2) = ExpPower (f t1) (f t2)
+  fmap f (ExpAtan2 t1 t2) = ExpAtan2 (f t1) (f t2)
   fmap f g = error "fmap"
 instance Foldable Expr where
   foldr f z (ExpNumber d) = z
+  foldr f z (ExpSin t1) = f t1 z
+  foldr f z (ExpCos t1) = f t1 z
+  foldr f z (ExpSqrt t1) = f t1 z
+  foldr f z (ExpAdd t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpSub t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpMul t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpDiv t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpPower t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
   foldr f z _ = error "foldr"
 instance Traversable Expr where
   traverse f (ExpNumber d) = pure $ ExpNumber d
+  traverse f (ExpSin t1) = ExpSin <$> f t1
+  traverse f (ExpCos t1) = ExpCos <$> f t1
+  traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
+  traverse f (ExpAdd t1 t2) = ExpAdd <$> f t1 <*> f t2
+  traverse f (ExpSub t1 t2) = ExpSub <$> f t1 <*> f t2
+  traverse f (ExpMul t1 t2) = ExpMul <$> f t1 <*> f t2
+  traverse f (ExpDiv t1 t2) = ExpDiv <$> f t1 <*> f t2
+  traverse f (ExpPower t1 t2) = ExpPower <$> f t1 <*> f t2
+  traverse f (ExpAtan2 t1 t2) = ExpAtan2 <$> f t1 <*> f t2
+  traverse f (ExpRectilinear t1 t2) = ExpRectilinear <$> f t1 <*> f t2
+  traverse f (ExpIfZero t1 t2 t3) = ExpIfZero <$> f t1 <*> f t2 <*> f t3
+  traverse f (ExpVar i) = pure $ ExpVar i
   traverse _ _ = error "traverse"
 
 newtype Mu a = Mu (a (Mu a))
@@ -79,6 +116,20 @@ instance Show (Mu Expr) where
       showsPrec 11 b .
       showString " " .
       showsPrec 11 c
+
+class Eval e where
+  eval :: Expr e -> e
+
+data U = Double Double
+       | Tuple U U
+
+instance Eval U where
+  eval (ExpNumber n) = Double n
+  eval (ExpSin (Double n)) = Double (P.sin n)
+  eval (ExpCos (Double n)) = Double (P.cos n)
+  eval (ExpIfZero (Double z) a b)
+    | z == 0    = a
+    | otherwise = b
       
 newtype Scalar where
   Scalar :: Mu Expr -> Scalar
@@ -104,6 +155,7 @@ instance Conditional Number where
 
 infixr 8 ^
 
+(^) :: Scalar -> Scalar -> Scalar
 Scalar a ^ Scalar b = Scalar (Mu $ ExpPower a b)
 
 type Number = Scalar
@@ -193,6 +245,7 @@ instance Math Radian where
   cos (Radian r) = Scalar $ Mu $ ExpCos r
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
     
+-- Sometimes called elevation
 newtype Longitude = Longitude Radian
   deriving (Show)
 
@@ -205,6 +258,7 @@ instance Num Longitude where
 instance Fractional Longitude where
   fromRational = Longitude . fromRational
 
+-- Sometimes called azimuth
 newtype Latitude = Latitude Radian
   deriving (Show)
 
@@ -224,6 +278,9 @@ instance Math Latitude where
   cos (Latitude a) = cos a  
   atan2 y x = Latitude $ atan2 y x
 
+-- A Coordinate on a sphere
+-- 0,0 is looking straight ahead
+-- Like rotating in Y, X, then Z?
 data Coord = Coord Latitude Longitude
 
 {-
@@ -268,6 +325,10 @@ main = print ()
 data Rectilinear = Rectilinear Number Number
   deriving Show
 
+instance MuRef Rectilinear where
+  type DeRef Rectilinear = Expr
+  mapDeRef f (Rectilinear (Scalar x) (Scalar y)) = mapDeRef f (Mu $ ExpRectilinear x y)
+
 -- These are from https://mathworld.wolfram.com/GnomonicProjection.html
 fromRecilinear :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
 fromRecilinear = undefined
@@ -280,82 +341,54 @@ toRecilinear (phi_1,lam_0) (phi,lam) = Rectilinear x y
     y = ifZero cos_c 0 $
           (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
---ifZero :: Number -> Number -> Number -> Number    
---ifZero = undefined
-
-------------------------------------------------------------------------------
-{-
-newtype Formula a = Formula a
-
-instance Show (Formula Number) where
-  showsPrec d (Formula n) = case n of
-    Number d -> shows d
-    Sin n    -> showParen (d > 10) $
-      showString "sin " . showsPrec 11 (Formula n)
-    Cos n    -> showParen (d > 10) $
-      showString "cos " . showsPrec 11 (Formula n)
-    Sqrt n    -> showParen (d > 10) $
-     showString "sqrt " . showsPrec 11 (Formula n)
-    NumAdd r1 r2 -> showParen (d > 6) $
-      showsPrec 7 (Formula r1) .
-      showString " + " .
-      showsPrec 7 (Formula r2)
-    NumSub r1 r2 -> showParen (d > 6) $
-      showsPrec 7 (Formula r1) .
-      showString " - " .
-      showsPrec 7 (Formula r2)
-    NumMul r1 r2 -> showParen (d > 7) $
-      showsPrec 8 (Formula r1) .
-      showString " * " .
-      showsPrec 8 (Formula r2)
-    NumDiv r1 r2 -> showParen (d > 7) $
-      showsPrec 8 (Formula r1) .
-      showString " / " .
-      showsPrec 8 (Formula r2)
-    NumIfZero n1 n2 n3 -> showParen (d > 10) $
-      showString "ifZero " .
-      showsPrec 11 (Formula n1) .
-      showString " " .
-      showsPrec 11 (Formula n2) .
-      showString " " .
-      showsPrec 11 (Formula n3)
-      
-    other -> error $ show other
-
-instance Show (Formula Radian) where
-  showsPrec d (Formula r) = case r of
-    Radian d -> shows d
-    Atan2 n1 n2 -> showParen (d > 10) $
-      showString "atan " .
-      showsPrec 11 (Formula n1) .
-      showString " " .
-      showsPrec 11 (Formula n2)
-    RadAdd r1 r2 -> showParen (d > 6) $
-      showsPrec 7 (Formula r1) .
-      showString " + " .
-      showsPrec 7 (Formula r2)
-    RadSub r1 r2 -> showParen (d > 6) $
-      showsPrec 7 (Formula r1) .
-      showString " - " .
-      showsPrec 7 (Formula r2)
-
-instance Show (Formula Rectilinear) where
-  showsPrec d (Formula (Rectilinear n1 n2)) =
-    showParen (d > 10) $
-      showString "Rectlinear " .
-      showsPrec 11 (Formula n1) .
-      showString " " .
-      showsPrec 11 (Formula n2)
-
--}
-
 ------------------------------------------------------------------------------
 
 instance MuRef Scalar where
   type DeRef Scalar = Expr
-  mapDeRef f (Scalar s) =  mapDeRef f s
+  mapDeRef f (Scalar s) = mapDeRef f s
 
 instance MuRef (Mu Expr) where
   type DeRef (Mu Expr) = Expr
-  mapDeRef f (Mu e) = traverse f e --  pure (ExpNumber d)  
---  mapDeRef f (Mu (ExpNumber d)) = traverse f e --  pure (ExpNumber d)
+  mapDeRef f (Mu e) = traverse f e 
+
+class Var a where
+  mkVar :: Int -> a
+  mkVar' :: Typeable b => (a -> b) -> a
+
+class Body a where
+  maxVar :: a -> Int
+
+instance Var Scalar where
+  mkVar = Scalar . Mu . ExpVar
+  mkVar' = Scalar . Mu . ExpVar' . toDyn
+
+instance (Var a, Body b, MuRef b, DeRef b ~ Expr)  => MuRef (a -> b) where
+  type DeRef (a -> b) = Expr
+  mapDeRef f fn = ExpLambda n <$> f r
+    where
+      (n,r) = maxApp fn
+
+instance Body Scalar where
+  maxVar (Scalar e) = maxVar e
+
+maxApp :: (Body b, Var t) => (t -> b) -> (Int, b)
+maxApp fn = traceShow ("maxapp",n) (n,r)
+    where
+      n = maxVar r + 1
+      r = fn (mkVar n)
+
+instance (Var a, Body b) => Body (a -> b) where
+  maxVar = fst . maxApp 
+
+instance Body (Mu Expr) where
+  maxVar (Mu e) = case e of
+    ExpVar i      -> 0
+    ExpLambda i e -> i  -- This short-cut is vital to avoid 
+    other -> foldr (+) 0 $ fmap maxVar other
+
+{-
+instance MuRef b => MuRef (a -> b) where
+  type DeRef (a -> b) = Expr
+  mapDeRef f fn = f (fn (error "arg"))
+-}
+
