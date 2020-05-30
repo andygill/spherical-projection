@@ -146,8 +146,9 @@ class Eval e where
   eval :: Expr e -> e
 
 -- The universal type, a number or a structure.
-data Value = Double Double
-       | Tuple [Value]
+data Value where
+  Double :: Double -> Value
+  Tuple  :: [Value] -> Value
   deriving Show
 
 instance Eval Value where
