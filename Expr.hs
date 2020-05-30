@@ -9,15 +9,13 @@ module Expr where
 import Data.Dynamic
 import Data.Reify
 import Debug.Trace
+import Data.Maybe
 
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
 
---class Eval e where
---  eval :: () -> e -> Number
-
 data Expr :: * -> * where
-  ExpNumber :: Double -> Expr t
+  ExpScalar :: Double -> Expr t
   ExpSin    :: t -> Expr t
   ExpCos    :: t -> Expr t
   ExpSqrt   :: t -> Expr t
@@ -29,15 +27,13 @@ data Expr :: * -> * where
   ExpAtan2  :: t -> t -> Expr t
   ExpLambda :: Int -> t -> Expr t
   ExpVar    :: Int -> Expr t
-  ExpLambda' :: t -> t -> Expr t
-  ExpVar'   :: Dynamic -> Expr t
   ExpRectilinear :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t    
 
 deriving instance Show t => Show (Expr t)
 
 instance Functor Expr where
-  fmap f (ExpNumber d) = ExpNumber d
+  fmap f (ExpScalar d) = ExpScalar d
   fmap f (ExpSin t1) = ExpSin (f t1)
   fmap f (ExpCos t1) = ExpCos (f t1)
   fmap f (ExpSqrt t1) = ExpSqrt (f t1)
@@ -49,7 +45,7 @@ instance Functor Expr where
   fmap f (ExpAtan2 t1 t2) = ExpAtan2 (f t1) (f t2)
   fmap f g = error "fmap"
 instance Foldable Expr where
-  foldr f z (ExpNumber d) = z
+  foldr f z (ExpScalar d) = z
   foldr f z (ExpSin t1) = f t1 z
   foldr f z (ExpCos t1) = f t1 z
   foldr f z (ExpSqrt t1) = f t1 z
@@ -61,7 +57,7 @@ instance Foldable Expr where
   foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
   foldr f z _ = error "foldr"
 instance Traversable Expr where
-  traverse f (ExpNumber d) = pure $ ExpNumber d
+  traverse f (ExpScalar d) = pure $ ExpScalar d
   traverse f (ExpSin t1) = ExpSin <$> f t1
   traverse f (ExpCos t1) = ExpCos <$> f t1
   traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
@@ -79,7 +75,7 @@ instance Traversable Expr where
 newtype Mu a = Mu (a (Mu a))
 
 instance Show (Mu Expr) where
-  showsPrec d (Mu (ExpNumber n)) = shows n
+  showsPrec d (Mu (ExpScalar n)) = shows n
   showsPrec d (Mu (ExpSin t)) = showParen (d > 10) $
       showString "sin " . showsPrec 11 t
   showsPrec d (Mu (ExpCos t)) = showParen (d > 10) $
@@ -146,3 +142,32 @@ instance Body (Mu Expr) where
     ExpLambda i e -> i  -- This short-cut is vital to avoid 
     other -> foldr (+) 0 $ fmap maxVar other
 
+class Eval e where
+  eval :: Expr e -> e
+
+-- The universal type, a number or a structure.
+data Value = Double Double
+       | Tuple [Value]
+  deriving Show
+
+instance Eval Value where
+  eval (ExpScalar n)       = Double n
+  eval (ExpSin (Double n)) = Double $ P.sin n
+  eval (ExpCos (Double n)) = Double $ P.cos n
+  eval (ExpAdd (Double a) (Double b)) = Double $ a + b
+  eval (ExpIfZero (Double z) a b)
+    | z == 0    = a
+    | otherwise = b
+  eval other = error (show other)
+      
+evalMu :: Mu Expr -> Value
+evalMu (Mu e) = eval $ fmap evalMu e
+
+evalGraph :: Graph Expr -> Value
+evalGraph (Graph xs u) = find u
+  where
+    -- use laziness to tie the bindings together
+    es = [ (u,eval $ fmap find e) | (u,e) <- xs ]
+    find :: Unique -> Value
+    find n = fromMaybe (error (show n ++ " not found")) $
+             lookup n es

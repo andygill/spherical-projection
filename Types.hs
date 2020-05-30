@@ -15,22 +15,8 @@ import qualified Prelude as P
 
 import Expr
 
-class Eval e where
-  eval :: Expr e -> e
-
 class Conditional e where
-  ifZero :: Number -> e -> e -> e
-
-data U = Double Double
-       | Tuple U U
-
-instance Eval U where
-  eval (ExpNumber n)       = Double n
-  eval (ExpSin (Double n)) = Double (P.sin n)
-  eval (ExpCos (Double n)) = Double (P.cos n)
-  eval (ExpIfZero (Double z) a b)
-    | z == 0    = a
-    | otherwise = b
+  ifZero :: Scalar -> e -> e -> e
       
 newtype Scalar where
   Scalar :: Mu Expr -> Scalar
@@ -42,25 +28,22 @@ instance Num Scalar where
   Scalar a + Scalar b = Scalar (Mu $ ExpAdd a b)
   Scalar a - Scalar b = Scalar (Mu $ ExpSub a b)
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
-  fromInteger = Scalar . Mu . ExpNumber . fromInteger
+  fromInteger = Scalar . Mu . ExpScalar . fromInteger
   
 instance Fractional Scalar where
   Scalar a / Scalar b = Scalar (Mu $ ExpDiv a b)
-  fromRational = Scalar . Mu . ExpNumber . fromRational  
+  fromRational = Scalar . Mu . ExpScalar . fromRational  
 
-instance Floating Number where
+instance Floating Scalar where
   sqrt (Scalar n) = Scalar (Mu $ ExpSqrt n)
 
-instance Conditional Number where
+instance Conditional Scalar where
   ifZero (Scalar a) (Scalar b) (Scalar c) = Scalar $ Mu $ ExpIfZero a b c
 
 infixr 8 ^
 
 (^) :: Scalar -> Scalar -> Scalar
 Scalar a ^ Scalar b = Scalar (Mu $ ExpPower a b)
-
-type Number = Scalar
-
 
 -- Expressions can be radians
 newtype Radian where
@@ -72,15 +55,15 @@ instance Show Radian where
 instance Num Radian where
   Radian r1 + Radian r2 = Radian $ Mu $ ExpAdd r1 r2
   Radian r1 - Radian r2 = Radian $ Mu $ ExpSub r1 r2
-  fromInteger = Radian . Mu . ExpNumber . fromInteger
+  fromInteger = Radian . Mu . ExpScalar . fromInteger
 
 instance Fractional Radian where
-  fromRational = Radian . Mu . ExpNumber . fromRational
+  fromRational = Radian . Mu . ExpScalar . fromRational
 
 class Math radian where
-  sin :: radian -> Number
-  cos :: radian -> Number
-  atan2 :: Number -> Number -> radian
+  sin :: radian -> Scalar
+  cos :: radian -> Scalar
+  atan2 :: Scalar -> Scalar -> radian
 
 instance Math Radian where
   sin (Radian r) = Scalar $ Mu $ ExpSin r
@@ -126,7 +109,7 @@ instance Math Latitude where
 data Coord = Coord Latitude Longitude
 
 -- A Point on a unit sphere
-type Point = (Number, Number, Number)
+type Point = (Scalar, Scalar, Scalar)
 
 longLatToPoint :: (Longitude, Latitude) -> Point
 longLatToPoint (long,lat) =
@@ -145,12 +128,13 @@ pointToLatLong (x,y,z)  = (long,lat)
 
 -- Rectilinear projection
 
-data Rectilinear = Rectilinear Number Number
+data Rectilinear = Rectilinear Scalar Scalar
   deriving Show
 
 instance MuRef Rectilinear where
   type DeRef Rectilinear = Expr
-  mapDeRef f (Rectilinear (Scalar x) (Scalar y)) = mapDeRef f (Mu $ ExpRectilinear x y)
+  mapDeRef f (Rectilinear (Scalar x) (Scalar y)) =
+    mapDeRef f (Mu $ ExpRectilinear x y)
 
 -- These are from https://mathworld.wolfram.com/GnomonicProjection.html
 fromRecilinear :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
@@ -175,4 +159,7 @@ instance Var Scalar where
 
 instance Body Scalar where
   maxVar (Scalar e) = maxVar e
+
+evalScalar :: Scalar -> Value
+evalScalar (Scalar e) = evalMu e
 
