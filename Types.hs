@@ -9,15 +9,19 @@ module Types where
 import Data.Dynamic
 import Data.Reify
 import Debug.Trace
+import Control.Applicative
 
-import Prelude hiding (sin, cos, atan2, (^))
+import Prelude hiding (sin, cos, atan2, asin, (^))
 import qualified Prelude as P
 
 import Expr
 
 class Conditional e where
   ifZero :: Scalar -> e -> e -> e
-      
+
+instance (Conditional a, Conditional b) => Conditional (a,b) where
+  ifZero s (a,b) (c,d) = (ifZero s a c, ifZero s b d)
+
 newtype Scalar where
   Scalar :: Mu Expr -> Scalar
 
@@ -61,17 +65,29 @@ instance Fractional Radian where
   fromRational = Radian . Mu . ExpScalar . fromRational
 
 class Math radian where
-  sin :: radian -> Scalar
-  cos :: radian -> Scalar
+  sin   :: radian -> Scalar
+  cos   :: radian -> Scalar
+  asin  :: Scalar -> radian
+  acos  :: Scalar -> radian
+  atan  :: Scalar -> radian
   atan2 :: Scalar -> Scalar -> radian
 
 instance Math Radian where
   sin (Radian r) = Scalar $ Mu $ ExpSin r
   cos (Radian r) = Scalar $ Mu $ ExpCos r
+  asin (Scalar s) = Radian $ Mu $ ExpAsin s
+  acos (Scalar s) = Radian $ Mu $ ExpAcos s
+  atan (Scalar s) = Radian $ Mu $ ExpAtan s
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
     
 instance Var Radian where
   mkVar = singletonVar (Radian . Mu . ExpVar)  
+
+instance ToMuExpr Radian where
+  toMuExpr (Radian a) = a
+
+instance Conditional Radian where
+  ifZero (Scalar a) (Radian b) (Radian c) = Radian $ Mu $ ExpIfZero a b c
 
 -- Sometimes called elevation
 newtype Longitude = Longitude Radian
@@ -86,6 +102,10 @@ instance Num Longitude where
 instance Fractional Longitude where
   fromRational = Longitude . fromRational
 
+instance Conditional Longitude where
+  ifZero a (Longitude b) (Longitude c) = Longitude $ ifZero a b c
+
+
 -- Sometimes called azimuth
 newtype Latitude = Latitude Radian
   deriving (Show)
@@ -99,12 +119,17 @@ instance Fractional Latitude where
 instance Math Longitude where
   sin (Longitude a) = sin a
   cos (Longitude a) = cos a
+  asin = Longitude . asin
   atan2 y x = Longitude $ atan2 y x
 
 instance Math Latitude where
   sin (Latitude a) = sin a
   cos (Latitude a) = cos a  
+  asin = Latitude . asin
   atan2 y x = Latitude $ atan2 y x
+
+instance Conditional Latitude where
+  ifZero a (Latitude b) (Latitude c) = Latitude $ ifZero a b c
 
 -- A Coordinate on a sphere
 -- 0,0 is looking straight ahead
@@ -143,18 +168,6 @@ instance MuRef Rectilinear where
   mapDeRef f (Rectilinear (Scalar x) (Scalar y)) =
     mapDeRef f (Mu $ ExpRectilinear x y)
 
--- These are from https://mathworld.wolfram.com/GnomonicProjection.html
-fromRecilinear :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
-fromRecilinear = undefined
-
-toRecilinear :: (Latitude, Longitude) -> (Latitude, Longitude) -> Rectilinear
-toRecilinear (phi_1,lam_0) (phi,lam) = ifZero cos_c (Rectilinear 0 0)
-                                     $ Rectilinear x y
-  where
-    cos_c = sin(phi_1) * sin(phi) + cos(phi_1) * cos(phi) * cos (lam - lam_0);
-    x = cos(phi) * sin (lam - lam_0) / cos_c
-    y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
-
 ------------------------------------------------------------------------------
 
 instance MuRef Scalar where
@@ -176,10 +189,21 @@ instance Var Latitude where
 instance Var Longitude where
   mkVar = Longitude <$> mkVar
   
+instance ToMuExpr Latitude where
+  toMuExpr (Latitude a) = toMuExpr a
+
+instance ToMuExpr Longitude where
+  toMuExpr (Longitude a) = toMuExpr a
+
 instance Body Rectilinear where
   maxVar (Rectilinear a b) = maxVar a `max` maxVar b
+
+instance ToMuExpr Rectilinear where
+  toMuExpr (Rectilinear (Scalar a) (Scalar b)) = Mu $ ExpRectilinear a b    
 
 instance ToExpr Rectilinear where
   reifyToExprFunction n (Rectilinear (Scalar a) (Scalar b)) =
     reifyToExprFunction n $ Mu $ ExpRectilinear a b
 
+instance Var Rectilinear where
+  mkVar = liftA2 Rectilinear mkVar mkVar

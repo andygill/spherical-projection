@@ -22,6 +22,10 @@ data Expr :: * -> * where
   ExpScalar :: Double -> Expr t
   ExpSin    :: t -> Expr t
   ExpCos    :: t -> Expr t
+  ExpTan    :: t -> Expr t
+  ExpAsin   :: t -> Expr t
+  ExpAcos   :: t -> Expr t
+  ExpAtan   :: t -> Expr t
   ExpSqrt   :: t -> Expr t
   ExpAdd    :: t -> t -> Expr t
   ExpSub    :: t -> t -> Expr t
@@ -31,7 +35,8 @@ data Expr :: * -> * where
   ExpAtan2  :: t -> t -> Expr t
   ExpLambda :: [Int] -> t -> Expr t
   ExpRectilinear :: t -> t -> Expr t
-  ExpIfZero :: t -> t -> t -> Expr t    
+  ExpIfZero :: t -> t -> t -> Expr t
+  ExpTuple  :: [t] -> Expr t
   ExpVar    :: Int -> Expr t
   ExpId     :: t -> Expr t
 
@@ -41,6 +46,10 @@ instance Functor Expr where
   fmap f (ExpScalar d) = ExpScalar d
   fmap f (ExpSin t1) = ExpSin (f t1)
   fmap f (ExpCos t1) = ExpCos (f t1)
+  fmap f (ExpTan t1) = ExpTan (f t1)
+  fmap f (ExpAsin t1) = ExpAsin (f t1)
+  fmap f (ExpAcos t1) = ExpAcos (f t1)
+  fmap f (ExpAtan t1) = ExpAtan (f t1)
   fmap f (ExpSqrt t1) = ExpSqrt (f t1)
   fmap f (ExpAdd t1 t2) = ExpAdd (f t1) (f t2)
   fmap f (ExpSub t1 t2) = ExpSub (f t1) (f t2)
@@ -52,11 +61,16 @@ instance Functor Expr where
   fmap f (ExpVar i) = ExpVar i
   fmap f (ExpRectilinear t1 t2) = ExpRectilinear (f t1) (f t2)
   fmap f (ExpIfZero t1 t2 t3) = ExpIfZero (f t1) (f t2) (f t3)
+  fmap f (ExpTuple ts) = ExpTuple $ fmap f ts
   fmap f g = error $ show ("fmap" )
 instance Foldable Expr where
   foldr f z (ExpScalar d) = z
   foldr f z (ExpSin t1) = f t1 z
   foldr f z (ExpCos t1) = f t1 z
+  foldr f z (ExpTan t1) = f t1 z
+  foldr f z (ExpAsin t1) = f t1 z
+  foldr f z (ExpAcos t1) = f t1 z
+  foldr f z (ExpAtan t1) = f t1 z
   foldr f z (ExpSqrt t1) = f t1 z
   foldr f z (ExpAdd t1 t2) = f t1 (f t2 z)
   foldr f z (ExpSub t1 t2) = f t1 (f t2 z)
@@ -66,12 +80,17 @@ instance Foldable Expr where
   foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
   foldr f z (ExpRectilinear t1 t2) = f t1 (f t2 z)
   foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
+  foldr f z (ExpTuple ts) = foldr f z ts  
   foldr f z (ExpVar _) = z
   foldr f z _ = error "foldr"
 instance Traversable Expr where
   traverse f (ExpScalar d) = pure $ ExpScalar d
   traverse f (ExpSin t1) = ExpSin <$> f t1
   traverse f (ExpCos t1) = ExpCos <$> f t1
+  traverse f (ExpTan t1) = ExpTan <$> f t1
+  traverse f (ExpAsin t1) = ExpAsin <$> f t1
+  traverse f (ExpAcos t1) = ExpAcos <$> f t1
+  traverse f (ExpAtan t1) = ExpAtan <$> f t1
   traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
   traverse f (ExpAdd t1 t2) = ExpAdd <$> f t1 <*> f t2
   traverse f (ExpSub t1 t2) = ExpSub <$> f t1 <*> f t2
@@ -82,6 +101,7 @@ instance Traversable Expr where
   traverse f (ExpRectilinear t1 t2) = ExpRectilinear <$> f t1 <*> f t2
   traverse f (ExpIfZero t1 t2 t3) = ExpIfZero <$> f t1 <*> f t2 <*> f t3
   traverse f (ExpVar i) = pure $ ExpVar i
+  traverse f (ExpTuple ts) = ExpTuple <$> traverse f ts
   traverse _ _ = error "traverse"
 
 newtype Mu a = Mu (a (Mu a))
@@ -213,6 +233,9 @@ reifyFunction = reifyToExprFunction 0
 class ToExpr s where
   reifyToExprFunction :: Int -> s -> IO ExprFunction
 
+class ToMuExpr s where
+  toMuExpr :: s -> Mu Expr
+
 instance (Var a, ToExpr b) => ToExpr (a -> b) where
   reifyToExprFunction n f = do
     let (a,n') = runVarGen mkVar n
@@ -240,6 +263,10 @@ instance ToExpr (Mu Expr) where
   reifyToExprFunction n s = do
     Graph xs n <- reifyGraph s
     return $ ExprFunction [] [(V n,V <$> e) | (n,e) <- xs] $ V n
+
+instance (ToMuExpr a, ToMuExpr b) => ToExpr (a,b) where
+  reifyToExprFunction n (a,b) =
+    reifyToExprFunction n $ Mu $ ExpTuple [toMuExpr a, toMuExpr b]
 
 newtype V = V Int
   deriving (Eq, Ord)
