@@ -12,6 +12,8 @@ import Debug.Trace
 import Data.Maybe
 import Control.Applicative
 import qualified Data.Graph as G
+import Data.Function(on)
+import Data.List(sortBy)
   
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
@@ -31,6 +33,7 @@ data Expr :: * -> * where
   ExpRectilinear :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t    
   ExpVar    :: Int -> Expr t
+  ExpId     :: t -> Expr t
 
 deriving instance Show t => Show (Expr t)
 
@@ -213,13 +216,30 @@ class ToExpr s where
 instance (Var a, ToExpr b) => ToExpr (a -> b) where
   reifyToExprFunction n f = do
     let (a,n') = runVarGen mkVar n
+    let tmpVars = [n..n'-1]
     ExprFunction xs ys zs <- reifyToExprFunction n' (f a)
-    return $ ExprFunction ((V <$> [n..n'-1]) ++ xs) ys zs
+    let vars = map fst $ sortBy (compare `on` snd)
+          [ (t,n)
+          | (t,ExpVar n) <- ys, n `elem` tmpVars
+          ]
+    print (vars,[n..n'-1])
+    if length vars > length [n..n'-1]
+    then error "to many vars"
+    else do
+      let scc = G.stronglyConnComp
+            [ (n,n,foldr (:) [] e)
+            | (n,e) <- ys
+            , not (n `elem` vars) -- remove ExpVar's
+            ]
+      let find n = fromMaybe (error (show n ++ " not found")) $
+                   lookup n ys
+      let ys' = [ (t,find t) | G.AcyclicSCC t <- scc ]
+      return $ ExprFunction (vars ++ xs) ys' zs
                              
 instance ToExpr (Mu Expr) where
   reifyToExprFunction n s = do
     Graph xs n <- reifyGraph s
-    return $ ExprFunction [] [(V n,V <$> e) | (n,e) <- xs] [V n]
+    return $ ExprFunction [] [(V n,V <$> e) | (n,e) <- xs] $ V n
 
 newtype V = V Int
   deriving (Eq, Ord)
@@ -229,14 +249,17 @@ instance Show V where
 
 data ExprFunction =
   ExprFunction
-    [V]           -- inputs, as a list
+    [V]           -- inputs, as a list of scalars
     [(V,Expr V)]  -- static assignments, in lexigraphical order
-    [V]           -- result, as a tuple
-  deriving Show
+    V             -- result, might be a vector
+--  deriving Show
 
   
--- instance Show ExprFunction where
---  show (ExprFunction (Graph xs i)) = unlines $
---    ["let"] ++ map show xs ++ ["in",  show i]
-
+instance Show ExprFunction where
+  show (ExprFunction as xs r) = unlines $
+      ["\\ " ++ show as ++ " -> in"] ++
+      map showAssign xs ++
+      ["in", "  " ++ show r]
+    where
+      showAssign (v,e) = "  " ++ show v ++ " = " ++ show e
 
