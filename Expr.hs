@@ -11,7 +11,8 @@ import Data.Reify
 import Debug.Trace
 import Data.Maybe
 import Control.Applicative
-
+import qualified Data.Graph as G
+  
 import Prelude hiding (sin, cos, atan2, (^))
 import qualified Prelude as P
 
@@ -27,9 +28,9 @@ data Expr :: * -> * where
   ExpPower  :: t -> t -> Expr t
   ExpAtan2  :: t -> t -> Expr t
   ExpLambda :: [Int] -> t -> Expr t
-  ExpVar    :: Int -> Expr t
   ExpRectilinear :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t    
+  ExpVar    :: Int -> Expr t
 
 deriving instance Show t => Show (Expr t)
 
@@ -60,7 +61,9 @@ instance Foldable Expr where
   foldr f z (ExpDiv t1 t2) = f t1 (f t2 z)
   foldr f z (ExpPower t1 t2) = f t1 (f t2 z)
   foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpRectilinear t1 t2) = f t1 (f t2 z)
   foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
+  foldr f z (ExpVar _) = z
   foldr f z _ = error "foldr"
 instance Traversable Expr where
   traverse f (ExpScalar d) = pure $ ExpScalar d
@@ -121,10 +124,12 @@ instance MuRef (Mu Expr) where
   mapDeRef f (Mu e) = traverse f e 
 
 class Var a where
-  mkVar :: Int -> (a,[Int])
-  mkVar' :: VarGen a
+  mkVar :: VarGen a
 
 data VarGen a = VarGen { runVarGen :: Int -> (a,Int) }
+
+singletonVar :: (Int -> a) -> VarGen a
+singletonVar f = VarGen $ \ i -> (f i , succ i)
 
 instance Functor VarGen where
   fmap f g = pure f <*> g
@@ -149,7 +154,7 @@ maxApp :: (Body b, Var t) => (t -> b) -> ([Int], b)
 maxApp fn = traceShow ("maxapp",n) ([n..n' - 1],r)
     where
       n      = maxVar r + 1
-      (v,n') = runVarGen mkVar' n
+      (v,n') = runVarGen mkVar n
       r      = fn v
 
 instance (Var a, Body b) => Body (a -> b) where
@@ -193,9 +198,45 @@ evalGraph (Graph xs u) = find u
              lookup n es
 
 instance (Var a, Var b) => Var (a,b) where
-  mkVar n = ((v1,v2),ns1 ++ ns2)
-    where
-      (v1,ns1) = mkVar n
-      (v2,ns2) = mkVar (maximum ns1 + 1)
+  mkVar = liftA2 (,) mkVar mkVar
 
-  mkVar' = liftA2 (,) mkVar' mkVar'
+------------------------------------------------------------------------------
+
+reifyFunction :: ToExpr s => s -> IO ExprFunction
+reifyFunction = reifyToExprFunction 0
+
+-- Because functions only *ever* occur at the outermost level,
+-- we handle them specially at entry.
+class ToExpr s where
+  reifyToExprFunction :: Int -> s -> IO ExprFunction
+
+instance (Var a, ToExpr b) => ToExpr (a -> b) where
+  reifyToExprFunction n f = do
+    let (a,n') = runVarGen mkVar n
+    ExprFunction xs ys zs <- reifyToExprFunction n' (f a)
+    return $ ExprFunction ((V <$> [n..n'-1]) ++ xs) ys zs
+                             
+instance ToExpr (Mu Expr) where
+  reifyToExprFunction n s = do
+    Graph xs n <- reifyGraph s
+    return $ ExprFunction [] [(V n,V <$> e) | (n,e) <- xs] [V n]
+
+newtype V = V Int
+  deriving (Eq, Ord)
+
+instance Show V where
+  show (V n) = "v" ++ show n
+
+data ExprFunction =
+  ExprFunction
+    [V]           -- inputs, as a list
+    [(V,Expr V)]  -- static assignments, in lexigraphical order
+    [V]           -- result, as a tuple
+  deriving Show
+
+  
+-- instance Show ExprFunction where
+--  show (ExprFunction (Graph xs i)) = unlines $
+--    ["let"] ++ map show xs ++ ["in",  show i]
+
+

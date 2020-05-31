@@ -25,6 +25,7 @@ executable spherical-projection
   -- other-extensions:
   build-depends:       base >=4.12,
                        data-reify,
-                       QuickCheck
+                       QuickCheck,
+                       containers
   -- hs-source-dirs:
   default-language:    Haskell2010

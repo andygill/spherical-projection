@@ -71,7 +71,7 @@ instance Math Radian where
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
     
 instance Var Radian where
-  mkVar' = VarGen $ \ i -> (Radian . Mu . ExpVar $ i , succ i)
+  mkVar = singletonVar (Radian . Mu . ExpVar)  
 
 -- Sometimes called elevation
 newtype Longitude = Longitude Radian
@@ -162,7 +162,7 @@ instance MuRef Scalar where
   mapDeRef f (Scalar s) = mapDeRef f s
 
 instance Var Scalar where
-  mkVar i = (Scalar . Mu . ExpVar $ i , [i])
+  mkVar = singletonVar (Scalar . Mu . ExpVar)
 
 instance Body Scalar where
   maxVar (Scalar e) = maxVar e
@@ -171,12 +171,15 @@ evalScalar :: Scalar -> Value
 evalScalar (Scalar e) = evalMu e
 
 instance Var Latitude where
-  mkVar i = (Latitude . Radian . Mu . ExpVar $ i , [i])
-  mkVar' = Latitude <$> mkVar'
+  mkVar = Latitude <$> mkVar
 
 instance Var Longitude where
-  mkVar i = (Longitude . Radian . Mu . ExpVar $ i , [i])
-  mkVar' = Longitude <$> mkVar'
+  mkVar = Longitude <$> mkVar
   
 instance Body Rectilinear where
   maxVar (Rectilinear a b) = maxVar a `max` maxVar b
+
+instance ToExpr Rectilinear where
+  reifyToExprFunction n (Rectilinear (Scalar a) (Scalar b)) =
+    reifyToExprFunction n $ Mu $ ExpRectilinear a b
+
