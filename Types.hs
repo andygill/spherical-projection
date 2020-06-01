@@ -32,6 +32,7 @@ instance Num Scalar where
   Scalar a + Scalar b = Scalar (Mu $ ExpAdd a b)
   Scalar a - Scalar b = Scalar (Mu $ ExpSub a b)
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
+  abs (Scalar a) = Scalar (Mu $ ExpAbs a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
   
 instance Fractional Scalar where
@@ -46,8 +47,8 @@ instance Conditional Scalar where
 
 infixr 8 ^
 
-(^) :: Scalar -> Scalar -> Scalar
-Scalar a ^ Scalar b = Scalar (Mu $ ExpPower a b)
+(^) :: Scalar -> Int -> Scalar
+Scalar a ^ b = Scalar (Mu $ ExpPower a b)
 
 -- Expressions can be radians
 newtype Radian where

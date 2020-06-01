@@ -27,11 +27,12 @@ data Expr :: * -> * where
   ExpAcos   :: t -> Expr t
   ExpAtan   :: t -> Expr t
   ExpSqrt   :: t -> Expr t
+  ExpAbs    :: t -> Expr t  
   ExpAdd    :: t -> t -> Expr t
   ExpSub    :: t -> t -> Expr t
   ExpMul    :: t -> t -> Expr t
   ExpDiv    :: t -> t -> Expr t
-  ExpPower  :: t -> t -> Expr t
+  ExpPower  :: t -> Int -> Expr t
   ExpAtan2  :: t -> t -> Expr t
   ExpLambda :: [Int] -> t -> Expr t
   ExpRectilinear :: t -> t -> Expr t
@@ -51,11 +52,12 @@ instance Functor Expr where
   fmap f (ExpAcos t1) = ExpAcos (f t1)
   fmap f (ExpAtan t1) = ExpAtan (f t1)
   fmap f (ExpSqrt t1) = ExpSqrt (f t1)
+  fmap f (ExpAbs t1) = ExpAbs (f t1)
   fmap f (ExpAdd t1 t2) = ExpAdd (f t1) (f t2)
   fmap f (ExpSub t1 t2) = ExpSub (f t1) (f t2)
   fmap f (ExpMul t1 t2) = ExpMul (f t1) (f t2)
   fmap f (ExpDiv t1 t2) = ExpDiv (f t1) (f t2)
-  fmap f (ExpPower t1 t2) = ExpPower (f t1) (f t2)
+  fmap f (ExpPower t1 t2) = ExpPower (f t1) t2
   fmap f (ExpAtan2 t1 t2) = ExpAtan2 (f t1) (f t2)
   fmap f (ExpLambda vs t) = ExpLambda vs (f t)
   fmap f (ExpVar i) = ExpVar i
@@ -72,11 +74,12 @@ instance Foldable Expr where
   foldr f z (ExpAcos t1) = f t1 z
   foldr f z (ExpAtan t1) = f t1 z
   foldr f z (ExpSqrt t1) = f t1 z
+  foldr f z (ExpAbs t1) = f t1 z
   foldr f z (ExpAdd t1 t2) = f t1 (f t2 z)
   foldr f z (ExpSub t1 t2) = f t1 (f t2 z)
   foldr f z (ExpMul t1 t2) = f t1 (f t2 z)
   foldr f z (ExpDiv t1 t2) = f t1 (f t2 z)
-  foldr f z (ExpPower t1 t2) = f t1 (f t2 z)
+  foldr f z (ExpPower t1 t2) = f t1 z
   foldr f z (ExpAtan2 t1 t2) = f t1 (f t2 z)
   foldr f z (ExpRectilinear t1 t2) = f t1 (f t2 z)
   foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
@@ -92,11 +95,12 @@ instance Traversable Expr where
   traverse f (ExpAcos t1) = ExpAcos <$> f t1
   traverse f (ExpAtan t1) = ExpAtan <$> f t1
   traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
+  traverse f (ExpAbs t1) = ExpAbs <$> f t1
   traverse f (ExpAdd t1 t2) = ExpAdd <$> f t1 <*> f t2
   traverse f (ExpSub t1 t2) = ExpSub <$> f t1 <*> f t2
   traverse f (ExpMul t1 t2) = ExpMul <$> f t1 <*> f t2
   traverse f (ExpDiv t1 t2) = ExpDiv <$> f t1 <*> f t2
-  traverse f (ExpPower t1 t2) = ExpPower <$> f t1 <*> f t2
+  traverse f (ExpPower t1 t2) = ExpPower <$> f t1 <*> pure t2
   traverse f (ExpAtan2 t1 t2) = ExpAtan2 <$> f t1 <*> f t2
   traverse f (ExpRectilinear t1 t2) = ExpRectilinear <$> f t1 <*> f t2
   traverse f (ExpIfZero t1 t2 t3) = ExpIfZero <$> f t1 <*> f t2 <*> f t3
@@ -112,8 +116,18 @@ instance Show (Mu Expr) where
       showString "sin " . showsPrec 11 t
   showsPrec d (Mu (ExpCos t)) = showParen (d > 10) $
       showString "cos " . showsPrec 11 t
+  showsPrec d (Mu (ExpTan t)) = showParen (d > 10) $
+      showString "tan " . showsPrec 11 t
+  showsPrec d (Mu (ExpAsin t)) = showParen (d > 10) $
+      showString "asin " . showsPrec 11 t
+  showsPrec d (Mu (ExpAcos t)) = showParen (d > 10) $
+      showString "acos " . showsPrec 11 t
+  showsPrec d (Mu (ExpAtan t)) = showParen (d > 10) $
+      showString "atan " . showsPrec 11 t
   showsPrec d (Mu (ExpSqrt t)) = showParen (d > 10) $
       showString "sqrt " . showsPrec 11 t
+  showsPrec d (Mu (ExpAbs t)) = showParen (d > 10) $
+      showString "abs " . showsPrec 11 t
   showsPrec d (Mu (ExpAdd n1 n2)) = showParen (d > 6) $
       showsPrec 7 n1  .
       showString " + " .
@@ -134,6 +148,11 @@ instance Show (Mu Expr) where
       showsPrec 9 n1  .
       showString " ^ " .
       showsPrec 9 n2
+  showsPrec d (Mu (ExpAtan2 n1 n2)) = showParen (d > 10) $
+      showString "atan2 " .
+      showsPrec 11 n1  .
+      showString " " .
+      showsPrec 11 n2
   showsPrec d (Mu (ExpIfZero a b c)) = showParen (d > 10) $
       showString "ifZero " .
       showsPrec 11 a .
@@ -141,6 +160,11 @@ instance Show (Mu Expr) where
       showsPrec 11 b .
       showString " " .
       showsPrec 11 c
+  showsPrec d (Mu (ExpTuple as)) = showParen (d > 10) $
+      showString "ifZero " .
+      showsPrec 11 as
+  showsPrec d (Mu (ExpRectilinear{})) = showString "Rectilinear"
+
 
 instance MuRef (Mu Expr) where
   type DeRef (Mu Expr) = Expr
@@ -202,10 +226,23 @@ instance Eval Value where
   eval (ExpScalar n)       = Double n
   eval (ExpSin (Double n)) = Double $ P.sin n
   eval (ExpCos (Double n)) = Double $ P.cos n
+  eval (ExpTan (Double n)) = Double $ P.tan n
+  eval (ExpAsin (Double n)) = Double $ P.asin n
+  eval (ExpAcos (Double n)) = Double $ P.acos n
+  eval (ExpAtan (Double n)) = Double $ P.atan n
   eval (ExpAdd (Double a) (Double b)) = Double $ a + b
+  eval (ExpSub (Double a) (Double b)) = Double $ a - b
+  eval (ExpMul (Double a) (Double b)) = Double $ a * b
+  eval (ExpDiv (Double a) (Double b)) = Double $ a / b
+  eval (ExpPower (Double a) b) = Double $ a P.^ b
+  eval (ExpAtan2 (Double a) (Double b)) = Double $ P.atan2 a b
+  eval (ExpSqrt (Double n)) = Double $ sqrt n
+  eval (ExpAbs (Double n)) = Double $ abs n
+  eval (ExpTuple ns) = Tuple ns
   eval (ExpIfZero (Double z) a b)
-    | z == 0    = a
-    | otherwise = b
+    | nearZero z = a
+    | otherwise  = b
+  eval (ExpRectilinear a b) = Tuple [a,b]
   eval other = error (show other)
       
 evalMu :: Mu Expr -> Value
@@ -268,6 +305,9 @@ instance (ToMuExpr a, ToMuExpr b) => ToExpr (a,b) where
   reifyToExprFunction n (a,b) =
     reifyToExprFunction n $ Mu $ ExpTuple [toMuExpr a, toMuExpr b]
 
+instance (ToMuExpr a, ToMuExpr b) => ToMuExpr (a,b) where
+  toMuExpr (a,b) = Mu $ ExpTuple [toMuExpr a, toMuExpr b]    
+
 newtype V = V Int
   deriving (Eq, Ord)
 
@@ -289,4 +329,7 @@ instance Show ExprFunction where
       ["in", "  " ++ show r]
     where
       showAssign (v,e) = "  " ++ show v ++ " = " ++ show e
+
+nearZero :: Double -> Bool
+nearZero n = abs n < 1e-6
 
