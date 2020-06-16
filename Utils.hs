@@ -27,11 +27,53 @@ fromRecilinear (phi,lam) (Rectilinear x y) = ifZero p (phi,lam) (phi',lam')
 
 toRecilinear :: (Latitude, Longitude) -> (Latitude, Longitude) -> Rectilinear
 toRecilinear (phi_1,lam_0) (phi,lam) =
-  ifZero cos_c (Rectilinear 0 0)
-                                     $ Rectilinear x y
+  ifZero cos_c (Rectilinear 0 0) $ Rectilinear x y
   where
     cos_c = (sin(phi_1) * sin(phi) + cos(phi_1) * cos(phi) * cos (lam - lam_0))
     x = cos(phi) * sin (lam - lam_0) / cos_c
     y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
+toRadian :: Scalar -> Radian
+toRadian (Scalar x) = Radian x
 
+scalarToLat = Latitude . toRadian
+scalarToLong = Longitude . toRadian
+
+-- 3D to fisheye http://paulbourke.net/dome/dualfish2sphere/
+-- f is the camera's aperature
+fromLongLatToFisheye :: (Longitude, Latitude) -> Scalar -> Fisheye
+fromLongLatToFisheye ll f = Fisheye r t
+    where
+        (x,y,z) = (longLatToPoint ll) :: Point
+        t = atan2 z x :: Radian
+        r = ((/) ((*) 2 $ atan2 (sqrt (x^2 + z^2)) (y)) f) :: Scalar
+
+-- f is aperature
+fromFisheyeToLongLat :: Fisheye -> Scalar -> (Longitude, Latitude)
+fromFisheyeToLongLat (Fisheye r t) f = (long, lat)
+    where
+        x = r * cos(t) :: Scalar
+        y = r * sin(t) :: Scalar
+        long = atan2 y x :: Longitude
+        lat = scalarToLat $ (r * f) / 2
+
+
+-- Little planet => http://codeofthedamned.com/index.php/the-little-planet-effect
+-- for
+-- Stereographic Projection => https://mathworld.wolfram.com/StereographicProjection.html
+fromLongLatToStero :: (Latitude, Longitude) -> (Latitude, Longitude) -> Rectilinear
+fromLongLatToStero (phi_1,lam_0) (phi,lam) = Rectilinear x y
+  --ifZero cos_c (Rectilinear 0 0) $ Rectilinear x y
+  where
+    -- it is supposed to be 2R but I am assuming unit sphere
+    k = (/) 2 $ 1 + (sin(phi_1) * sin(phi)) + (cos(phi_1) * cos(phi) * cos (lam - lam_0))
+    x = k * cos(phi) * sin (lam - lam_0)
+    y = k * (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0))
+
+fromSteroToLongLat :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
+fromSteroToLongLat (phi,lam) (Rectilinear x y) = ifZero p (phi,lam) (phi',lam')
+  where
+    p = sqrt (x*x + y*y) :: Scalar
+    c = 2 * atan (p/2) :: Radian -- also should be 2R
+    phi' = asin (cos(c) * sin(phi) + (y * sin(c) * cos(phi) / p))
+    lam' = (+) (lam) $ Longitude $ atan $ (x * sin(c)) / (p * cos(phi) * cos(c) - y * sin(phi) * sin(c))
