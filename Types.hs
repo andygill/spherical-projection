@@ -43,6 +43,7 @@ instance Fractional Scalar where
 instance Floating Scalar where
   sqrt (Scalar n) = Scalar (Mu $ ExpSqrt n)
 
+-- Added for fisheye projections
 instance Math Scalar where
     atan2 (Scalar a) (Scalar b) = Scalar $ Mu $ ExpAtan2 a b
 

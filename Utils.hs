@@ -33,6 +33,7 @@ toRecilinear (phi_1,lam_0) (phi,lam) =
     x = cos(phi) * sin (lam - lam_0) / cos_c
     y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
+-- Simple function for when I couldn't coerce a scalar to Radian
 toRadian :: Scalar -> Radian
 toRadian (Scalar x) = Radian x
 
@@ -61,6 +62,7 @@ fromFisheyeToLongLat (Fisheye r t) f = (long, lat)
 -- Little planet => http://codeofthedamned.com/index.php/the-little-planet-effect
 -- for
 -- Stereographic Projection => https://mathworld.wolfram.com/StereographicProjection.html
+-- TODO: We need the if zero thing here as well
 fromLongLatToStero :: (Latitude, Longitude) -> (Latitude, Longitude) -> Rectilinear
 fromLongLatToStero (phi_1,lam_0) (phi,lam) = Rectilinear x y
   --ifZero cos_c (Rectilinear 0 0) $ Rectilinear x y
@@ -70,6 +72,7 @@ fromLongLatToStero (phi_1,lam_0) (phi,lam) = Rectilinear x y
     x = k * cos(phi) * sin (lam - lam_0)
     y = k * (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0))
 
+-- TODO: We need the if zero thing here as well
 fromSteroToLongLat :: (Latitude, Longitude) -> Rectilinear -> (Latitude, Longitude)
 fromSteroToLongLat (phi,lam) (Rectilinear x y) = ifZero p (phi,lam) (phi',lam')
   where
