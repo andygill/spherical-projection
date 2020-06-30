@@ -58,7 +58,6 @@ fromFisheyeToLongLat (Fisheye r t) f = (long, lat)
         long = atan2 y x :: Longitude
         lat = scalarToLat $ (r * f) / 2
 
-
 -- Little planet => http://codeofthedamned.com/index.php/the-little-planet-effect
 -- for
 -- Stereographic Projection => https://mathworld.wolfram.com/StereographicProjection.html
