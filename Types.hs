@@ -146,7 +146,7 @@ data Coord = Coord Latitude Longitude
 -- A Point on a unit sphere
 type Point = (Scalar, Scalar, Scalar)
 
-type Point2D = (Scalar, Scalar)
+--type Point2D = (Scalar, Scalar)
 
 longLatToPoint :: (Longitude, Latitude) -> Point
 longLatToPoint (long,lat) =

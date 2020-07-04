@@ -34,6 +34,7 @@ toRecilinear (phi_1,lam_0) (phi,lam) =
     y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
 -- Simple function for when I couldn't coerce a scalar to Radian
+
 toRadian :: Scalar -> Radian
 toRadian (Scalar x) = Radian x
 
