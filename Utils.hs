@@ -33,26 +33,18 @@ toRecilinear (phi_1,lam_0) (phi,lam) =
     x = cos(phi) * sin (lam - lam_0) / cos_c
     y = (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0)) / cos_c
 
--- Simple function for when I couldn't coerce a scalar to Radian
-
-toRadian :: Scalar -> Radian
-toRadian (Scalar x) = Radian x
-
-scalarToLat = Latitude . toRadian
-scalarToLong = Longitude . toRadian
-
 -- 3D to fisheye http://paulbourke.net/dome/dualfish2sphere/
 -- f is the camera's aperature
-fromLongLatToFisheye :: (Longitude, Latitude) -> Scalar -> Fisheye
-fromLongLatToFisheye ll f = Fisheye r t
+fromLongLatToFisheye :: Scalar -> (Longitude, Latitude) -> Fisheye
+fromLongLatToFisheye f ll = Fisheye r t
     where
         (x,y,z) = (longLatToPoint ll) :: Point
         t = atan2 z x :: Radian
-        r = ((/) ((*) 2 $ atan2 (sqrt (x^2 + z^2)) (y)) f) :: Scalar
+        r = ((2 * atan2 (sqrt (x^2 + z^2)) (y)) / (f * num_pi)) :: Scalar
 
 -- f is aperature
-fromFisheyeToLongLat :: Fisheye -> Scalar -> (Longitude, Latitude)
-fromFisheyeToLongLat (Fisheye r t) f = (long, lat)
+fromFisheyeToLongLat :: Scalar -> Fisheye -> (Longitude, Latitude)
+fromFisheyeToLongLat f (Fisheye r t) = (long, lat)
     where
         x = r * cos(t) :: Scalar
         y = r * sin(t) :: Scalar
@@ -80,3 +72,18 @@ fromSteroToLongLat (phi,lam) (Rectilinear x y) = ifZero p (phi,lam) (phi',lam')
     c = 2 * atan (p/2) :: Radian -- also should be 2R
     phi' = asin (cos(c) * sin(phi) + (y * sin(c) * cos(phi) / p))
     lam' = (+) (lam) $ Longitude $ atan $ (x * sin(c)) / (p * cos(phi) * cos(c) - y * sin(phi) * sin(c))
+
+
+longLatToPoint2D :: (Longitude, Latitude) -> Point2D
+longLatToPoint2D (long, lat) = (x,y)
+    where
+        x = (longToScalar long) / num_pi
+        y = (latToScalar lat) * 2 / num_pi
+
+normPoint2DToLongLat :: Point2D -> (Longitude, Latitude)
+normPoint2DToLongLat (x,y) = (long, lat)
+    where
+        long = scalarToLong $ x * num_pi
+        lat = scalarToLat $ (y * num_pi) / 2
+
+num_pi = 3.141592653589793

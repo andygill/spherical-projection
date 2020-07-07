@@ -109,6 +109,10 @@ instance Num Longitude where
 instance Fractional Longitude where
   fromRational = Longitude . fromRational
 
+{-}
+instance Floating Longitude where
+  fromIntegral = Longitude . fromIntegral-}
+
 instance Conditional Longitude where
   ifZero a (Longitude b) (Longitude c) = Longitude $ ifZero a b c
 
@@ -122,6 +126,9 @@ instance Num Latitude where
 
 instance Fractional Latitude where
   fromRational = Latitude . fromRational
+{-
+instance Floating Longitude where
+  fromIntegral = Latitude . fromIntegral -}
 
 instance Math Longitude where
   sin (Longitude a) = sin a
@@ -146,7 +153,7 @@ data Coord = Coord Latitude Longitude
 -- A Point on a unit sphere
 type Point = (Scalar, Scalar, Scalar)
 
---type Point2D = (Scalar, Scalar)
+type Point2D = (Scalar, Scalar)
 
 longLatToPoint :: (Longitude, Latitude) -> Point
 longLatToPoint (long,lat) =
@@ -164,15 +171,28 @@ pointToLongLat (x,y,z)  = (long,lat)
 longLatToPoint2D :: (Longitude, Latitude) -> Point2D
 longLatToPoint2D (long, lat) = (x,y)
     where
-        x = long / pi
-        y = (2 * lat) / pi
+        x = longToScalar $ long / pi
+        y = latToScalar $ (2 * lat) / pi
 
 normPoint2DToLongLat :: Point2D -> (Longitude, Latitude)
 normPoint2DToLongLat (x,y) = (long, lat)
     where
-        long = x * pi
-        lat = (y * pi) / 2
-        -}
+        long = scalarToLong $ x * pi
+        lat = scalarToLat $ (y * pi) / 2-}
+
+-- Simple function for when I couldn't coerce a scalar to Radian
+
+toRadian :: Scalar -> Radian
+toRadian (Scalar x) = Radian x
+
+scalarToLat = Latitude . toRadian
+scalarToLong = Longitude . toRadian
+
+toScalar :: Radian -> Scalar
+toScalar (Radian x) = Scalar x
+
+latToScalar (Latitude x) = toScalar x
+longToScalar (Longitude x) = toScalar x
 ------------------------------------------------------------------------------
 
 -- Rectilinear projection
