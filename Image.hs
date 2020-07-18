@@ -10,6 +10,7 @@ import qualified Codec.Picture.Types as M
 import Control.Monad.ST
 import Control.Monad
 import System.Environment
+import Debug.Trace
 
 import Expr
 import Types
@@ -59,17 +60,18 @@ inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
 inverseFisheyeTransform img@Image {..} = runST $ do
     let radius = div (min imageWidth imageHeight) 2
     mimg <- M.newMutableImage radius radius
-    let go x y  | x >= 2 * radius = go 0 (y + 1)
-                | y >= 2 * radius = M.freezeImage mimg
+    let go x y  | x >= imageWidth = go 0 (y + 1)
+                | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
                     let (x1,y1) = normalize' radius radius (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let norm = normalize radius radius (x,y)
-                        let ll = extractTuple $ evalMu $ toMuExpr $ fromFisheyeToLongLat 1.0 $ equiRecToFisheye norm
-                        let (x',y') = longLatDoubleToPixelCoord radius radius ll
-                        writePixel mimg x' y' (pixelAt img x y)
+                        let (x',y') = longLatDoubleToPixelCoord radius radius $ extractTuple $ evalMu $ toMuExpr $ equiRecToFisheyeToLongLat 1.0 $ normalize radius radius (x,y)
+                        if x' >= 2 * radius || x' < 0 || y' >= 2 * radius || y' < 0 then
+                            writePixel mimg 0 0 $ pixelAt img x y
+                        else
+                            writePixel mimg x' y' $ pixelAt img x y
                     else
-                        writePixel mimg x y $ PixelRGB8 0 0 0
+                        writePixel mimg 0 0 $ pixelAt img x y
                     go (x + 1) y
     go 0 0
 
@@ -115,13 +117,12 @@ fisheyeToPixelCoord :: Height -> Width -> Double2D -> PixelCoord
 fisheyeToPixelCoord h w fe = unnormalize h w $ filterRadius fe
 
 --inverse where it takes a pixel on the image to be created and seeing where it is on the original image
-equiRecToFisheye :: Point2D -> Fisheye
-equiRecToFisheye (x,y) = Fisheye r t
+equiRecToFisheyeToLongLat :: Scalar -> Point2D -> (Longitude, Latitude)
+equiRecToFisheyeToLongLat ap (x,y) = (long, lat)
     where
-        r = sqrt $ x*x + y*y
-        t = ifZero r 0 $ ifZero x (toRadian $ -num_pi) $ acos $ x / r :: Radian
-
-        --t = ifZero r 0 $ ifZero x (toRadian $ num_pi / 2) (acos $ x / r)
+        r       = sqrt $ x*x + y*y
+        long    = scalarToLong $ r * ap / 2
+        lat     = ifZero x (ifZero y 0 (scalarToLat $ num_pi / 2)) $ atan2 y x
 
 {-
 WHAT MY GOAL IS: This breaks up teh quadrants correctly
