@@ -17,14 +17,14 @@ import Types
 import Utils
 
 testFunc = do
-    --thing <- readImage "./pano.jpeg"
-    --let filename = "./test.jpeg"
-    thing <- readImage "./before-rotation.png"
-    let filename = "./test.png"
+    thing <- readImage "./pano.jpeg"
+    let filename = "./test.jpeg"
+    --thing <- readImage "./before-rotation.png"
+    --let filename = "./test.png"
     case thing of
             Left err -> putStrLn ("Could not read image: " ++ err)
-            Right img -> (savePngImage filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
-            --Right img -> (saveJpgImage 100 filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
+            --Right img -> (savePngImage filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
+            Right img -> (saveJpgImage 100 filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
             --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
     print $ "done"
 
@@ -58,20 +58,20 @@ fisheyeTransform img@Image {..} = runST $ do
 
 inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
 inverseFisheyeTransform img@Image {..} = runST $ do
-    let radius = div (min imageWidth imageHeight) 2
-    mimg <- M.newMutableImage radius radius
+    let side = min imageWidth imageHeight
+    mimg <- M.newMutableImage side side
     let go x y  | x >= imageWidth = go 0 (y + 1)
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let (x1,y1) = normalize' radius radius (x,y)
+                    let (x1,y1) = normalize' side side (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = longLatDoubleToPixelCoord radius radius $ extractTuple $ evalMu $ toMuExpr $ equiRecToFisheyeToLongLat 1.0 $ normalize radius radius (x,y)
-                        if x' >= 2 * radius || x' < 0 || y' >= 2 * radius || y' < 0 then
-                            writePixel mimg 0 0 $ pixelAt img x y
+                        let (x',y') = longLatDoubleToPixelCoord side side $ extractTuple $ evalMu $ toMuExpr $ equiRecToFisheyeToLongLat 2.4 $ normalize side side (x,y)
+                        if x' >= side || x' < 0 || y' >= side || y' < 0 then
+                            writePixel mimg x y $ pixelAt img x y
                         else
-                            writePixel mimg x' y' $ pixelAt img x y
+                            writePixel mimg x y $ pixelAt img x' y'
                     else
-                        writePixel mimg 0 0 $ pixelAt img x y
+                        writePixel mimg x y $ pixelAt img x y
                     go (x + 1) y
     go 0 0
 
@@ -122,7 +122,7 @@ equiRecToFisheyeToLongLat ap (x,y) = (long, lat)
     where
         r       = sqrt $ x*x + y*y
         long    = scalarToLong $ r * ap / 2
-        lat     = ifZero x (ifZero y 0 (scalarToLat $ num_pi / 2)) $ atan2 y x
+        lat     = ifZero y (ifZero x 0 $ atan2 y x) $ atan2 y x
 
 {-
 WHAT MY GOAL IS: This breaks up teh quadrants correctly
@@ -142,7 +142,12 @@ equiRecToFisheye (x,y) = Fisheye r t
                 False -> 0 :: Radian-}
 
 longLatDoubleToPixelCoord :: Int -> Int -> Double2D -> PixelCoord
-longLatDoubleToPixelCoord h w (x,y) = unnormalize h w (x/pi, y*2/pi)
+longLatDoubleToPixelCoord h w (x,y) = unnormalize h w $ filterBadBoys (x/pi, y*2/pi)
+
+filterBadBoys :: Double2D -> Double2D
+filterBadBoys (x,y) | abs x > 1.0 = filterBadBoys (-1.0, y)
+                    | abs y > 1.0 = (x, 1.0)
+                    | otherwise = (x,y)
 
 filterRadius :: Double2D -> Double2D
 filterRadius (r, t) | r >= pi = (- pi, pi / 2)
