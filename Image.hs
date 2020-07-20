@@ -17,14 +17,14 @@ import Types
 import Utils
 
 testFunc = do
-    thing <- readImage "./pano.jpeg"
-    let filename = "./test.jpeg"
-    --thing <- readImage "./before-rotation.png"
-    --let filename = "./test.png"
+    --thing <- readImage "./pano.jpeg"
+    --let filename = "./test.jpeg"
+    thing <- readImage "./before-rotation.png"
+    let filename = "./test.png"
     case thing of
             Left err -> putStrLn ("Could not read image: " ++ err)
-            --Right img -> (savePngImage filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
-            Right img -> (saveJpgImage 100 filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
+            Right img -> (savePngImage filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
+            --Right img -> (saveJpgImage 100 filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8 . dynSquare) img
             --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
     print $ "done"
 
@@ -38,6 +38,7 @@ dynSquare :: DynamicImage -> DynamicImage
 dynSquare = dynamicPixelMap squareImage
 
 squareImage :: Pixel a => Image a -> Image a
+--squareImage img = generateImage (\x y -> pixelAt img (x + (edge `div` 3)) y) edge edge
 squareImage img = generateImage (\x y -> pixelAt img x y) edge edge
     where
         edge = min (imageWidth img) (imageHeight img)
@@ -49,8 +50,7 @@ fisheyeTransform img@Image {..} = runST $ do
     let go x y  | x >= imageWidth  = go 0 (y + 1)
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let ll = pixelCoordToLongLat imageHeight imageWidth (x,y)
-                    let a = extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheye (1.0 :: Scalar) ll
+                    let a = extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheye (1.0 :: Scalar) $ pixelCoordToLongLat imageHeight imageWidth (x,y)
                     let (x',y') = fisheyeToPixelCoord imageHeight imageWidth a
                     writePixel mimg x' y' (pixelAt img x y)
                     go (x + 1) y
@@ -58,20 +58,21 @@ fisheyeTransform img@Image {..} = runST $ do
 
 inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
 inverseFisheyeTransform img@Image {..} = runST $ do
-    let side = min imageWidth imageHeight
-    mimg <- M.newMutableImage side side
-    let go x y  | x >= imageWidth = go 0 (y + 1)
+    -- Want to have a square image regardless of its original size
+    let size = min (imageWidth) (imageHeight)
+    mimg <- M.newMutableImage size size
+    let go x y  | x >= imageWidth = go 0 $ y + 1
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let (x1,y1) = normalize' side side (x,y)
+                    let (x1,y1) = normalize' size size (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = longLatDoubleToPixelCoord side side $ extractTuple $ evalMu $ toMuExpr $ equiRecToFisheyeToLongLat 2.4 $ normalize side side (x,y)
-                        if x' >= side || x' < 0 || y' >= side || y' < 0 then
-                            writePixel mimg x y $ pixelAt img x y
+                        let (x',y') = longLatDoubleToPixelCoord size size $ extractTuple $ evalMu $ toMuExpr $ equiRecToFisheyeToLongLat 1.0 $ normalize size size (x,y)
+                        if x' >= size || x' < 0 || y' >= size || y' < 0 then
+                            writePixel mimg x y $ PixelRGB8 0 0 0
                         else
                             writePixel mimg x y $ pixelAt img x' y'
                     else
-                        writePixel mimg x y $ pixelAt img x y
+                        writePixel mimg x y $ PixelRGB8 0 0 0
                     go (x + 1) y
     go 0 0
 
@@ -91,24 +92,24 @@ normalize h w (x,y) = (x', y')
     where
         dx = div w 2
         dy = div h 2
-        x' = (fromIntegral $ x - dx) / fromIntegral dx
-        y' = (fromIntegral $ dy - y) / fromIntegral dy
+        x' = (fromIntegral x / fromIntegral dx) - 1
+        y' = (-) 1 $ fromIntegral y / fromIntegral dy
 
 normalize' :: Height -> Width -> PixelCoord -> Double2D
 normalize' h w (x,y) = (x', y')
     where
         dx = div w 2
         dy = div h 2
-        x' = (fromIntegral $ x - dx) / fromIntegral dx
-        y' = (fromIntegral $ dy - y) / fromIntegral dy
+        x' = (fromIntegral x / fromIntegral dx) - 1
+        y' = (-) 1 $ fromIntegral y / fromIntegral dy
 
 unnormalize :: Height -> Width -> Double2D -> PixelCoord
 unnormalize h w (x', y') = (x,y)
     where
         dx = fromIntegral $ div w 2
         dy = fromIntegral $ div h 2
-        x  = round $ (dx * x') + dx
-        y  = round $ dy - (dy * y')
+        x  = round $ dx * (1 + x')
+        y  = round $ dy * (1 - y')
 
 pixelCoordToLongLat :: Height -> Width -> PixelCoord -> (Longitude, Latitude)
 pixelCoordToLongLat h w p = normPoint2DToLongLat $ normalize h w p
@@ -122,7 +123,7 @@ equiRecToFisheyeToLongLat ap (x,y) = (long, lat)
     where
         r       = sqrt $ x*x + y*y
         long    = scalarToLong $ r * ap / 2
-        lat     = ifZero y (ifZero x 0 $ atan2 y x) $ atan2 y x
+        lat     = atan2 y x
 
 {-
 WHAT MY GOAL IS: This breaks up teh quadrants correctly
@@ -144,9 +145,9 @@ equiRecToFisheye (x,y) = Fisheye r t
 longLatDoubleToPixelCoord :: Int -> Int -> Double2D -> PixelCoord
 longLatDoubleToPixelCoord h w (x,y) = unnormalize h w $ filterBadBoys (x/pi, y*2/pi)
 
+-- if the abs (x,y) > 1 then put the point in teh top left corner, otherwise continue
 filterBadBoys :: Double2D -> Double2D
-filterBadBoys (x,y) | abs x > 1.0 = filterBadBoys (-1.0, y)
-                    | abs y > 1.0 = (x, 1.0)
+filterBadBoys (x,y) | abs x > 1.0 || abs y > 1.0 = (-1.0, 1.0)
                     | otherwise = (x,y)
 
 filterRadius :: Double2D -> Double2D
