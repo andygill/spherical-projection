@@ -28,6 +28,7 @@ data Expr :: * -> * where
   ExpAtan   :: t -> Expr t
   ExpSqrt   :: t -> Expr t
   ExpAbs    :: t -> Expr t
+  ExpSignum :: t -> Expr t
   ExpAdd    :: t -> t -> Expr t
   ExpSub    :: t -> t -> Expr t
   ExpMul    :: t -> t -> Expr t
@@ -54,6 +55,7 @@ instance Functor Expr where
   fmap f (ExpAtan t1) = ExpAtan (f t1)
   fmap f (ExpSqrt t1) = ExpSqrt (f t1)
   fmap f (ExpAbs t1) = ExpAbs (f t1)
+  fmap f (ExpSignum t1) = ExpSignum (f t1)
   fmap f (ExpAdd t1 t2) = ExpAdd (f t1) (f t2)
   fmap f (ExpSub t1 t2) = ExpSub (f t1) (f t2)
   fmap f (ExpMul t1 t2) = ExpMul (f t1) (f t2)
@@ -77,6 +79,7 @@ instance Foldable Expr where
   foldr f z (ExpAtan t1) = f t1 z
   foldr f z (ExpSqrt t1) = f t1 z
   foldr f z (ExpAbs t1) = f t1 z
+  foldr f z (ExpSignum t1) = f t1 z
   foldr f z (ExpAdd t1 t2) = f t1 (f t2 z)
   foldr f z (ExpSub t1 t2) = f t1 (f t2 z)
   foldr f z (ExpMul t1 t2) = f t1 (f t2 z)
@@ -89,6 +92,7 @@ instance Foldable Expr where
   foldr f z (ExpTuple ts) = foldr f z ts
   foldr f z (ExpVar _) = z
   foldr f z _ = error "foldr"
+
 instance Traversable Expr where
   traverse f (ExpScalar d) = pure $ ExpScalar d
   traverse f (ExpSin t1) = ExpSin <$> f t1
@@ -99,6 +103,7 @@ instance Traversable Expr where
   traverse f (ExpAtan t1) = ExpAtan <$> f t1
   traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
   traverse f (ExpAbs t1) = ExpAbs <$> f t1
+  traverse f (ExpSignum t1) = ExpSignum <$> f t1
   traverse f (ExpAdd t1 t2) = ExpAdd <$> f t1 <*> f t2
   traverse f (ExpSub t1 t2) = ExpSub <$> f t1 <*> f t2
   traverse f (ExpMul t1 t2) = ExpMul <$> f t1 <*> f t2
@@ -132,6 +137,8 @@ instance Show (Mu Expr) where
       showString "sqrt " . showsPrec 11 t
   showsPrec d (Mu (ExpAbs t)) = showParen (d > 10) $
       showString "abs " . showsPrec 11 t
+  showsPrec d (Mu (ExpSignum t)) = showParen (d > 10) $
+      showString "signum " . showsPrec 11 t
   showsPrec d (Mu (ExpAdd n1 n2)) = showParen (d > 6) $
       showsPrec 7 n1  .
       showString " + " .
@@ -243,6 +250,7 @@ instance Eval Value where
   eval (ExpAtan2 (Double a) (Double b)) = Double $ P.atan2 a b
   eval (ExpSqrt (Double n)) = Double $ sqrt n
   eval (ExpAbs (Double n)) = Double $ abs n
+  eval (ExpSignum (Double n)) = Double $ signum n
   eval (ExpTuple ns) = Tuple ns
   eval (ExpIfZero (Double z) a b)
     | nearZero z = a

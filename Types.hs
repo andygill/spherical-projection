@@ -33,6 +33,7 @@ instance Num Scalar where
   Scalar a - Scalar b = Scalar (Mu $ ExpSub a b)
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
   abs (Scalar a) = Scalar (Mu $ ExpAbs a)
+  signum (Scalar a) = Scalar (Mu $ ExpSignum a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
 
 
