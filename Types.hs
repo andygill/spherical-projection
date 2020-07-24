@@ -9,9 +9,9 @@ module Types where
 import Data.Dynamic
 import Data.Reify
 import Debug.Trace
-import Control.Applicative
+import Control.Applicative (liftA2)
 
-import Prelude hiding (sin, cos, atan2, asin, (^))
+import Prelude hiding (sin, cos, atan2, asin, acos, (^))
 import qualified Prelude as P
 
 import Expr
@@ -135,12 +135,14 @@ instance Math Longitude where
   sin (Longitude a) = sin a
   cos (Longitude a) = cos a
   asin = Longitude . asin
+  acos = Longitude . acos
   atan2 y x = Longitude $ atan2 y x
 
 instance Math Latitude where
   sin (Latitude a) = sin a
   cos (Latitude a) = cos a
   asin = Latitude . asin
+  acos = Latitude . acos
   atan2 y x = Latitude $ atan2 y x
 
 instance Conditional Latitude where
