@@ -16,20 +16,32 @@ import Expr
 import Types as T
 import Utils
 
-testFunc = do
-    --thing <- readImage "./grid.tga"
-    --let filename = "./test.tga"
-    thing <- readImage "./pano.jpeg"
-    let filename = "./test.jpeg"
-    --thing <- readImage "./earth.png"
-    --let filename = "./test.png"
-    case thing of
-            Left err -> putStrLn ("Could not read image: " ++ err)
-            --Right img -> (writePng filename . inverseFisheyeTransform . convertRGB8 . dynSquare) img
-            Right img -> (saveJpgImage 100 filename . ImageRGB8 . inverseFisheyeTransform . convertRGB8) img
-            --Right img -> (writeTga filename . inverseFisheyeTransform . convertRGB8) img
-            --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
-    print $ "done"
+runner :: [String] -> IO ()
+runner [pathFrom, pathTo, ext, transform] = do
+    inImage <- readImage pathFrom
+    --s :: Pixel a => Image a -> ByteString
+    --f :: ImageRGB8 -> ImageRGB8
+    case inImage of
+        Left err -> error ("Could not read image: " ++ err)
+        --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
+        Right img -> do
+            putStrLn $ "Transform: " ++ transform
+            putStrLn $ "File Save format: " ++ ext
+            putStrLn $ "Save Path: \"" ++ pathTo ++ "\""
+            putStrLn $ "From File: \"" ++ pathFrom ++ "\""
+            (s . f . convertRGB8) img
+            where
+                s = case ext of
+                    "png"   -> writePng pathTo
+                    "jpeg"  -> saveJpgImage 100 pathTo . ImageRGB8
+                    "tga"   -> writeTga pathTo
+                    _       -> error "Invalid extension"
+                f = case transform of
+                    "1" -> inverseFisheyeTransform
+                    "2" -> fisheyeToPano
+                    "3" -> inversePanoToLittlePlanet
+                    _   -> error "Invalid transform option"
+    print "done"
 
 dynWidth :: DynamicImage -> Int
 dynWidth img = dynamicMap imageWidth img
@@ -49,7 +61,6 @@ squareImage img = generateImage (\x y -> pixelAt img x y) edge edge
 -- reference this: https://www.stackbuilders.com/tutorials/haskell/image-processing/
 inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
 inverseFisheyeTransform img@Image {..} = runST $ do
-    -- Want to have a square image regardless of its original size
     let size = min imageHeight imageWidth
     mimg <- M.newMutableImage size size
     let go x y  | x >= size = go 0 $ y + 1
@@ -67,14 +78,45 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                     go (x + 1) y
     go 0 0
 
-fisheyeToPano :: Image PixelRGB8 -> Image PixelRGB8
+fisheyeToPano :: Pixel a => Image a -> Image a
 fisheyeToPano img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
-    mimg <- M.newMutableImage (2*size) size
-    let f p = longLatDoubleToPixelCoord size (2*size) $ extractTuple $ evalMu $ toMuExpr $ equiRecFisheyeToLongLat (4/2.8) $ normalize imageHeight imageWidth p
-    let points = [(i,j)| i<-[0..imageWidth-1], j<-[0..imageHeight - 1]]
-    sequence $ map (\ ((x,y) , (x',y')) -> writePixel mimg x' y' $ pixelAt img x y) $ map (\p -> (p, f p)) points
-    M.freezeImage mimg
+    mimg <- M.newMutableImage size size
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = longLatDoubleToPixelCoord size size $ extractTuple $ evalMu $ toMuExpr $ equiRecFisheyeToLongLat (4/2.8) $ normalize imageHeight imageWidth (x,y)
+                    writePixel mimg x' y' $ pixelAt img x y
+                    go (x + 1) y
+    go 0 0
+
+panoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
+panoToLittlePlanet img@Image {..} = runST $ do
+    mimg <- M.newMutableImage imageWidth imageHeight
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToStero (0,0) $ pixelCoordToLongLat imageHeight imageWidth (x,y)
+                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x' y' $ pixelAt img x y
+                    go (x + 1) y
+    go 0 0
+
+inversePanoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
+inversePanoToLittlePlanet img@Image {..} = runST $ do
+    mimg <- M.newMutableImage imageWidth imageHeight
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromSteroToLongLat (0,0) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
+                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
+                    go (x + 1) y
+    go 0 0
 
 extractTuple :: Value -> (Double, Double)
 extractTuple t = case t of Tuple [Double x, Double y] -> (x,y)
@@ -89,21 +131,21 @@ type Width = Int
 {-}
 opt :: (Num a, Eq a) => Expr a -> Expr a
 opt (ExpScalar a) = (ExpScalar a)
-opt (ExpSin 0) = ExpScalar 0
+opt (ExpSin (ExpScalar 0)) = ExpScalar 0
 opt (ExpSin (ExpScalar a)) = ExpSin a
-opt (ExpSin a) = opt $ ExpSin b where b = opt a
-opt (ExpCos 0) = ExpScalar 1.0
+opt (ExpSin a) = opt $ ExpSin $ opt a
+opt (ExpCos (ExpScalar 0)) = ExpScalar 1.0
 opt (ExpCos (ExpScalar a)) = ExpCos a
-opt (ExpCos a) = opt $ ExpSin b where b = opt a
-opt (ExpMul 0 _) = ExpScalar 0
-opt (ExpMul _ 0) = ExpScalar 0
-opt (ExpMul 1 a) = a
-opt (ExpMul a 1) = a
-opt (ExpMul a b) = opt $ ExpMul f g where f = opt a; g = opt b
+opt (ExpCos a) = opt $ ExpSin $ opt a
+opt (ExpMul (ExpScalar 0) _) = ExpScalar 0
+opt (ExpMul _ (ExpScalar 0)) = ExpScalar 0
+opt (ExpMul (ExpScalar 1) a) = ExpId $ opt a
+opt (ExpMul a (ExpScalar 1)) = ExpId $ opt a
+--opt (ExpMul a b) = opt $ ExpMul (opt $ ExpId a) (opt $ ExpId b)
 opt (ExpDiv 0 _) = ExpScalar 0
 opt (ExpDiv _ 0) = error "Divide by Zero"
 opt (ExpDiv 0 0) = error "Zero over Zero"
-opt a = a-}
+opt a = a -}
 
 normalize :: Height -> Width -> PixelCoord -> Point2D
 normalize h w (x,y) = (x', y')
@@ -129,6 +171,9 @@ unnormalize h w (x', y') = (x,y)
         x  = round $ dx * (1 + x')
         y  = round $ dy * (1 - y')
 
+point2DtoRectilinear :: Point2D -> Rectilinear
+point2DtoRectilinear (x,y) = Rectilinear x y
+
 pixelCoordToLongLat :: Height -> Width -> PixelCoord -> (Longitude, Latitude)
 pixelCoordToLongLat h w p = normPoint2DToLongLat $ normalize h w p
 
@@ -142,7 +187,6 @@ equiRecFisheyeToLongLat ap (x,y) = pointToLongLat (T.sin phi * T.cos theta, T.co
         r       = sqrt $ x*x + y*y
         phi     = toRadian $ r * ap / 2
         theta   = atan2 y x :: Radian
-
 
 -- SUPER MATHY
 normFisheyeToLongLat :: Scalar -> Point2D -> (Longitude, Latitude)
