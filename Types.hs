@@ -9,9 +9,9 @@ module Types where
 import Data.Dynamic
 import Data.Reify
 import Debug.Trace
-import Control.Applicative
+import Control.Applicative (liftA2)
 
-import Prelude hiding (sin, cos, atan2, asin, (^))
+import Prelude hiding (sin, cos, atan2, asin, acos, (^))
 import qualified Prelude as P
 
 import Expr
@@ -33,14 +33,20 @@ instance Num Scalar where
   Scalar a - Scalar b = Scalar (Mu $ ExpSub a b)
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
   abs (Scalar a) = Scalar (Mu $ ExpAbs a)
+  signum (Scalar a) = Scalar (Mu $ ExpSignum a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
-  
+
+
 instance Fractional Scalar where
   Scalar a / Scalar b = Scalar (Mu $ ExpDiv a b)
-  fromRational = Scalar . Mu . ExpScalar . fromRational  
+  fromRational = Scalar . Mu . ExpScalar . fromRational
 
 instance Floating Scalar where
   sqrt (Scalar n) = Scalar (Mu $ ExpSqrt n)
+
+-- Added for fisheye projections
+instance Math Scalar where
+    atan2 (Scalar a) (Scalar b) = Scalar $ Mu $ ExpAtan2 a b
 
 instance Conditional Scalar where
   ifZero (Scalar a) (Scalar b) (Scalar c) = Scalar $ Mu $ ExpIfZero a b c
@@ -56,10 +62,11 @@ newtype Radian where
 
 instance Show Radian where
   showsPrec d (Radian e) = showsPrec d e
-  
+
 instance Num Radian where
   Radian r1 + Radian r2 = Radian $ Mu $ ExpAdd r1 r2
   Radian r1 - Radian r2 = Radian $ Mu $ ExpSub r1 r2
+  Radian r1 * Radian r2 = Radian $ Mu $ ExpMul r1 r2
   fromInteger = Radian . Mu . ExpScalar . fromInteger
 
 instance Fractional Radian where
@@ -80,9 +87,9 @@ instance Math Radian where
   acos (Scalar s) = Radian $ Mu $ ExpAcos s
   atan (Scalar s) = Radian $ Mu $ ExpAtan s
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
-    
+
 instance Var Radian where
-  mkVar = singletonVar (Radian . Mu . ExpVar)  
+  mkVar = singletonVar (Radian . Mu . ExpVar)
 
 instance ToMuExpr Radian where
   toMuExpr (Radian a) = a
@@ -98,10 +105,14 @@ instance Num Longitude where
   Longitude a + Longitude b = Longitude (a + b)
   Longitude a - Longitude b = Longitude (a - b)
 
-  fromInteger = Longitude . fromInteger 
+  fromInteger = Longitude . fromInteger
 
 instance Fractional Longitude where
   fromRational = Longitude . fromRational
+
+{-}
+instance Floating Longitude where
+  fromIntegral = Longitude . fromIntegral-}
 
 instance Conditional Longitude where
   ifZero a (Longitude b) (Longitude c) = Longitude $ ifZero a b c
@@ -112,21 +123,26 @@ newtype Latitude = Latitude Radian
   deriving (Show)
 
 instance Num Latitude where
-  fromInteger = Latitude . fromInteger 
+  fromInteger = Latitude . fromInteger
 
 instance Fractional Latitude where
   fromRational = Latitude . fromRational
+{-
+instance Floating Longitude where
+  fromIntegral = Latitude . fromIntegral -}
 
 instance Math Longitude where
   sin (Longitude a) = sin a
   cos (Longitude a) = cos a
   asin = Longitude . asin
+  acos = Longitude . acos
   atan2 y x = Longitude $ atan2 y x
 
 instance Math Latitude where
   sin (Latitude a) = sin a
-  cos (Latitude a) = cos a  
+  cos (Latitude a) = cos a
   asin = Latitude . asin
+  acos = Latitude . acos
   atan2 y x = Latitude $ atan2 y x
 
 instance Conditional Latitude where
@@ -140,6 +156,8 @@ data Coord = Coord Latitude Longitude
 -- A Point on a unit sphere
 type Point = (Scalar, Scalar, Scalar)
 
+type Point2D = (Scalar, Scalar)
+
 longLatToPoint :: (Longitude, Latitude) -> Point
 longLatToPoint (long,lat) =
   ( cos lat * cos long
@@ -147,12 +165,37 @@ longLatToPoint (long,lat) =
   , sin lat
   )
 
-pointToLatLong :: Point -> (Longitude, Latitude)
-pointToLatLong (x,y,z)  = (long,lat)
+pointToLongLat :: Point -> (Longitude, Latitude)
+pointToLongLat (x,y,z)  = (long,lat)
   where
     long = atan2 y x
     lat  = atan2 z (sqrt (x^2 + y^2))
+{-
+longLatToPoint2D :: (Longitude, Latitude) -> Point2D
+longLatToPoint2D (long, lat) = (x,y)
+    where
+        x = longToScalar $ long / pi
+        y = latToScalar $ (2 * lat) / pi
 
+normPoint2DToLongLat :: Point2D -> (Longitude, Latitude)
+normPoint2DToLongLat (x,y) = (long, lat)
+    where
+        long = scalarToLong $ x * pi
+        lat = scalarToLat $ (y * pi) / 2-}
+
+-- Simple function for when I couldn't coerce a scalar to Radian
+
+toRadian :: Scalar -> Radian
+toRadian (Scalar x) = Radian x
+
+scalarToLat = Latitude . toRadian
+scalarToLong = Longitude . toRadian
+
+toScalar :: Radian -> Scalar
+toScalar (Radian x) = Scalar x
+
+latToScalar (Latitude x) = toScalar x
+longToScalar (Longitude x) = toScalar x
 ------------------------------------------------------------------------------
 
 -- Rectilinear projection
@@ -169,6 +212,14 @@ instance MuRef Rectilinear where
   mapDeRef f (Rectilinear (Scalar x) (Scalar y)) =
     mapDeRef f (Mu $ ExpRectilinear x y)
 
+-- fisheye projection
+data Fisheye = Fisheye Scalar Radian
+    deriving Show
+
+instance MuRef Fisheye where
+  type DeRef Fisheye = Expr
+  mapDeRef f (Fisheye (Scalar r) (Radian t)) =
+    mapDeRef f (Mu $ ExpFisheye r t)
 ------------------------------------------------------------------------------
 
 instance MuRef Scalar where
@@ -176,7 +227,7 @@ instance MuRef Scalar where
   mapDeRef f (Scalar s) = mapDeRef f s
 
 instance Var Scalar where
-  mkVar = singletonVar (Scalar . Mu . ExpVar)
+    mkVar = singletonVar (Scalar . Mu . ExpVar)
 
 instance Body Scalar where
   maxVar (Scalar e) = maxVar e
@@ -185,26 +236,36 @@ evalScalar :: Scalar -> Value
 evalScalar (Scalar e) = evalMu e
 
 instance Var Latitude where
-  mkVar = Latitude <$> mkVar
+    mkVar = Latitude <$> mkVar
 
 instance Var Longitude where
-  mkVar = Longitude <$> mkVar
-  
+    mkVar = Longitude <$> mkVar
+
 instance ToMuExpr Latitude where
-  toMuExpr (Latitude a) = toMuExpr a
+    toMuExpr (Latitude a) = toMuExpr a
 
 instance ToMuExpr Longitude where
-  toMuExpr (Longitude a) = toMuExpr a
+    toMuExpr (Longitude a) = toMuExpr a
 
 instance Body Rectilinear where
-  maxVar (Rectilinear a b) = maxVar a `max` maxVar b
+    maxVar (Rectilinear a b) = maxVar a `max` maxVar b
 
 instance ToMuExpr Rectilinear where
-  toMuExpr (Rectilinear (Scalar a) (Scalar b)) = Mu $ ExpRectilinear a b    
+    toMuExpr (Rectilinear (Scalar a) (Scalar b)) = Mu $ ExpRectilinear a b
 
 instance ToExpr Rectilinear where
-  reifyToExprFunction n (Rectilinear (Scalar a) (Scalar b)) =
-    reifyToExprFunction n $ Mu $ ExpRectilinear a b
+    reifyToExprFunction n (Rectilinear (Scalar a) (Scalar b)) =
+        reifyToExprFunction n $ Mu $ ExpRectilinear a b
 
 instance Var Rectilinear where
-  mkVar = liftA2 Rectilinear mkVar mkVar
+    mkVar = liftA2 Rectilinear mkVar mkVar
+
+instance ToMuExpr Fisheye where
+    toMuExpr (Fisheye (Scalar a) (Radian b)) = Mu $ ExpFisheye a b
+
+instance ToExpr Fisheye where
+    reifyToExprFunction n (Fisheye (Scalar a) (Radian b)) =
+      reifyToExprFunction n $ Mu $ ExpFisheye a b
+
+instance Var Fisheye where
+    mkVar = liftA2 Fisheye mkVar mkVar

@@ -22,11 +22,13 @@ executable spherical-projection
   other-modules:       Expr,
                        Types,
                        Props,
-                       Utils
+                       Utils,
+                       Image
   -- other-extensions:
   build-depends:       base >=4.12,
                        data-reify,
                        QuickCheck,
-                       containers
+                       containers,
+                       JuicyPixels
   -- hs-source-dirs:
   default-language:    Haskell2010
