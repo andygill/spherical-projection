@@ -104,6 +104,7 @@ newtype Longitude = Longitude Radian
 instance Num Longitude where
   Longitude a + Longitude b = Longitude (a + b)
   Longitude a - Longitude b = Longitude (a - b)
+  Longitude a * Longitude b = Longitude (a * b)
 
   fromInteger = Longitude . fromInteger
 
@@ -123,7 +124,10 @@ newtype Latitude = Latitude Radian
   deriving (Show)
 
 instance Num Latitude where
-  fromInteger = Latitude . fromInteger
+    Latitude a + Latitude b = Latitude (a + b)
+    Latitude a - Latitude b = Latitude (a - b)
+    Latitude a * Latitude b = Latitude (a * b)
+    fromInteger = Latitude . fromInteger
 
 instance Fractional Latitude where
   fromRational = Latitude . fromRational

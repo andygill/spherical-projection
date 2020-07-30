@@ -55,9 +55,8 @@ fromFisheyeToLongLat f (Fisheye r t) = (long, lat)
 -- for
 -- Stereographic Projection => https://mathworld.wolfram.com/StereographicProjection.html
 -- TODO: We need the if zero thing here as well
-fromLongLatToStero :: (Longitude, Latitude) -> (Longitude, Latitude) -> Rectilinear
-fromLongLatToStero (lam_0, phi_1) (lam, phi) = Rectilinear x y
-  --ifZero cos_c (Rectilinear 0 0) $ Rectilinear x y
+fromSteroToRectilinear :: (Longitude, Latitude) -> (Longitude, Latitude) -> Rectilinear
+fromSteroToRectilinear (lam_0, phi_1) (lam, phi) = Rectilinear x y
   where
     -- it is supposed to be 2R but I am assuming unit sphere
     k = (/) 2 $ 1 + (sin(phi_1) * sin(phi)) + (cos(phi_1) * cos(phi) * cos (lam - lam_0))
@@ -65,11 +64,11 @@ fromLongLatToStero (lam_0, phi_1) (lam, phi) = Rectilinear x y
     y = k * (cos(phi_1) * sin(phi) - sin(phi_1) * cos(phi) * cos (lam - lam_0))
 
 -- TODO: We need the if zero thing here as well
-fromSteroToLongLat :: (Longitude, Latitude) -> Rectilinear -> (Longitude, Latitude)
-fromSteroToLongLat (lam_0, phi_1) (Rectilinear x y) = ifZero p (lam_0,phi_1) (lam', phi')
+fromRectilinearToStereo :: (Longitude, Latitude) -> Rectilinear -> (Longitude, Latitude)
+fromRectilinearToStereo (lam_0, phi_1) (Rectilinear x y) = ifZero p (lam_0,phi_1) (lam', phi')
   where
     p    = sqrt (x*x + y*y) :: Scalar
-    c    = 2 * atan (p/2)   :: Radian -- also should be 2R
+    c    = (2 * atan2 p 2) :: Radian -- also should be 2R
     phi' = asin (cos(c) * sin(phi_1) + (y * sin(c) * cos(phi_1) / p))
     lam' = (+) (lam_0) $ Longitude $ atan $ (x * sin(c)) / (p * cos(phi_1) * cos(c) - y * sin(phi_1) * sin(c))
 
@@ -84,5 +83,14 @@ normPoint2DToLongLat (x,y) = (long, lat)
     where
         long = scalarToLong $ x * num_pi
         lat = scalarToLat $ (y * num_pi) / 2
+
+algebraicStereoThroughNeg1 :: Scalar -> Point2D -> (Longitude, Latitude)
+algebraicStereoThroughNeg1 s (x,y) = pointToLongLat (x * t, y * t, 1 - 2 * t)
+    where
+        -- multiply each point times 10 (easier to sift)
+        --scale = (sqrt $ ( (8/s) - 4)) / 2
+        r_sq = s * (x*x + y*y)
+        t = 4 / (r_sq + 4)
+
 
 num_pi = 3.141592653589793
