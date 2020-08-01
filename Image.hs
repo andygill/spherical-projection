@@ -4,7 +4,6 @@ module Image where
 
 import Prelude hiding (atan2, asin, acos, atan, (^))
 import qualified Prelude as P
-import Debug.Trace
 import Codec.Picture
 import qualified Codec.Picture.Types as M
 import Control.Monad.ST
@@ -116,7 +115,7 @@ panoToLittlePlanet img@Image {..} = runST $ do
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ algebraicStereoThroughNeg1 10 $ normalize size size (x,y)
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ algebraicStereoThroughNeg1 (35/8) $ normalize size size (x,y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
@@ -135,24 +134,6 @@ type Double2D = (Double,Double)
 type PixelCoord = (Int, Int)
 type Height = Int
 type Width = Int
-{-}
-opt :: (Num a, Eq a) => Expr a -> Expr a
-opt (ExpScalar a) = (ExpScalar a)
-opt (ExpSin (ExpScalar 0)) = ExpScalar 0
-opt (ExpSin (ExpScalar a)) = ExpSin a
-opt (ExpSin a) = opt $ ExpSin $ opt a
-opt (ExpCos (ExpScalar 0)) = ExpScalar 1.0
-opt (ExpCos (ExpScalar a)) = ExpCos a
-opt (ExpCos a) = opt $ ExpSin $ opt a
-opt (ExpMul (ExpScalar 0) _) = ExpScalar 0
-opt (ExpMul _ (ExpScalar 0)) = ExpScalar 0
-opt (ExpMul (ExpScalar 1) a) = ExpId $ opt a
-opt (ExpMul a (ExpScalar 1)) = ExpId $ opt a
---opt (ExpMul a b) = opt $ ExpMul (opt $ ExpId a) (opt $ ExpId b)
-opt (ExpDiv 0 _) = ExpScalar 0
-opt (ExpDiv _ 0) = error "Divide by Zero"
-opt (ExpDiv 0 0) = error "Zero over Zero"
-opt a = a -}
 
 normalize :: Height -> Width -> PixelCoord -> Point2D
 normalize h w (x,y) = (x', y')

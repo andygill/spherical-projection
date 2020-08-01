@@ -36,7 +36,6 @@ instance Num Scalar where
   signum (Scalar a) = Scalar (Mu $ ExpSignum a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
 
-
 instance Fractional Scalar where
   Scalar a / Scalar b = Scalar (Mu $ ExpDiv a b)
   fromRational = Scalar . Mu . ExpScalar . fromRational
@@ -46,6 +45,8 @@ instance Floating Scalar where
 
 -- Added for fisheye projections
 instance Math Scalar where
+    sin (Scalar r) = Scalar $ Mu $ ExpSin r
+    cos (Scalar r) = Scalar $ Mu $ ExpCos r
     atan2 (Scalar a) (Scalar b) = Scalar $ Mu $ ExpAtan2 a b
 
 instance Conditional Scalar where
@@ -55,6 +56,25 @@ infixr 8 ^
 
 (^) :: Scalar -> Int -> Scalar
 Scalar a ^ b = Scalar (Mu $ ExpPower a b)
+
+instance ToMuExpr Scalar where
+    toMuExpr (Scalar a) = a
+
+instance ToExpr Scalar where
+    reifyToExprFunction n (Scalar a) = reifyToExprFunction n a
+
+instance MuRef Scalar where
+  type DeRef Scalar = Expr
+  mapDeRef f (Scalar s) = mapDeRef f s
+
+instance Var Scalar where
+    mkVar = singletonVar (Scalar . Mu . ExpVar)
+
+instance Body Scalar where
+  maxVar (Scalar e) = maxVar e
+
+evalScalar :: Scalar -> Value
+evalScalar (Scalar e) = evalMu e
 
 -- Expressions can be radians
 newtype Radian where
@@ -70,7 +90,8 @@ instance Num Radian where
   fromInteger = Radian . Mu . ExpScalar . fromInteger
 
 instance Fractional Radian where
-  fromRational = Radian . Mu . ExpScalar . fromRational
+    Radian a / Radian b = Radian (Mu $ ExpDiv a b)
+    fromRational = Radian . Mu . ExpScalar . fromRational
 
 class Math radian where
   sin   :: radian -> Scalar
@@ -88,11 +109,27 @@ instance Math Radian where
   atan (Scalar s) = Radian $ Mu $ ExpAtan s
   atan2 (Scalar y) (Scalar x) = Radian $ Mu $ ExpAtan2 y x
 
+instance Floating Radian where
+    sqrt (Radian n) = Radian (Mu $ ExpSqrt n)
+
 instance Var Radian where
   mkVar = singletonVar (Radian . Mu . ExpVar)
 
 instance ToMuExpr Radian where
   toMuExpr (Radian a) = a
+
+instance MuRef Radian where
+    type DeRef Radian = Expr
+    mapDeRef f (Radian s) = mapDeRef f s
+
+instance Body Radian where
+    maxVar (Radian e) = maxVar e
+
+evalRadian :: Radian -> Value
+evalRadian (Radian e) = evalMu e
+
+instance ToExpr Radian where
+  reifyToExprFunction n (Radian a) = reifyToExprFunction n a
 
 instance Conditional Radian where
   ifZero (Scalar a) (Radian b) (Radian c) = Radian $ Mu $ ExpIfZero a b c
@@ -105,19 +142,13 @@ instance Num Longitude where
   Longitude a + Longitude b = Longitude (a + b)
   Longitude a - Longitude b = Longitude (a - b)
   Longitude a * Longitude b = Longitude (a * b)
-
   fromInteger = Longitude . fromInteger
 
 instance Fractional Longitude where
   fromRational = Longitude . fromRational
 
-{-}
-instance Floating Longitude where
-  fromIntegral = Longitude . fromIntegral-}
-
 instance Conditional Longitude where
   ifZero a (Longitude b) (Longitude c) = Longitude $ ifZero a b c
-
 
 -- Sometimes called azimuth
 newtype Latitude = Latitude Radian
@@ -131,9 +162,9 @@ instance Num Latitude where
 
 instance Fractional Latitude where
   fromRational = Latitude . fromRational
-{-
-instance Floating Longitude where
-  fromIntegral = Latitude . fromIntegral -}
+
+instance Conditional Latitude where
+  ifZero a (Latitude b) (Latitude c) = Latitude $ ifZero a b c
 
 instance Math Longitude where
   sin (Longitude a) = sin a
@@ -148,14 +179,6 @@ instance Math Latitude where
   asin = Latitude . asin
   acos = Latitude . acos
   atan2 y x = Latitude $ atan2 y x
-
-instance Conditional Latitude where
-  ifZero a (Latitude b) (Latitude c) = Latitude $ ifZero a b c
-
--- A Coordinate on a sphere
--- 0,0 is looking straight ahead
--- Like rotating in Y, X, then Z?
-data Coord = Coord Latitude Longitude
 
 -- A Point on a unit sphere
 type Point = (Scalar, Scalar, Scalar)
@@ -174,20 +197,6 @@ pointToLongLat (x,y,z)  = (long,lat)
   where
     long = atan2 y x
     lat  = atan2 z (sqrt (x^2 + y^2))
-{-
-longLatToPoint2D :: (Longitude, Latitude) -> Point2D
-longLatToPoint2D (long, lat) = (x,y)
-    where
-        x = longToScalar $ long / pi
-        y = latToScalar $ (2 * lat) / pi
-
-normPoint2DToLongLat :: Point2D -> (Longitude, Latitude)
-normPoint2DToLongLat (x,y) = (long, lat)
-    where
-        long = scalarToLong $ x * pi
-        lat = scalarToLat $ (y * pi) / 2-}
-
--- Simple function for when I couldn't coerce a scalar to Radian
 
 toRadian :: Scalar -> Radian
 toRadian (Scalar x) = Radian x
@@ -225,20 +234,6 @@ instance MuRef Fisheye where
   mapDeRef f (Fisheye (Scalar r) (Radian t)) =
     mapDeRef f (Mu $ ExpFisheye r t)
 ------------------------------------------------------------------------------
-
-instance MuRef Scalar where
-  type DeRef Scalar = Expr
-  mapDeRef f (Scalar s) = mapDeRef f s
-
-instance Var Scalar where
-    mkVar = singletonVar (Scalar . Mu . ExpVar)
-
-instance Body Scalar where
-  maxVar (Scalar e) = maxVar e
-
-evalScalar :: Scalar -> Value
-evalScalar (Scalar e) = evalMu e
-
 instance Var Latitude where
     mkVar = Latitude <$> mkVar
 

@@ -92,5 +92,12 @@ algebraicStereoThroughNeg1 s (x,y) = pointToLongLat (x * t, y * t, 1 - 2 * t)
         r_sq = s * (x*x + y*y)
         t = 4 / (r_sq + 4)
 
+algebraicStereoThroughPos1 :: Scalar -> Point2D -> (Longitude, Latitude)
+algebraicStereoThroughPos1 ap (x,y) = pointToLongLat (x * t, y * t, (2*t) - 1)
+    where
+        -- multiply each point times 10 (easier to sift)
+        --scale = (sqrt $ ( (8/s) - 4)) / 2
+        r_sq = ap * (x*x + y*y)
+        t = 4 / (r_sq + 4)
 
 num_pi = 3.141592653589793
