@@ -1,3 +1,9 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
+module Optimizer where
+
 import Expr
 import Types
 --Return a Maybe (Expr a)
@@ -68,6 +74,7 @@ opt (Mu (ExpSqrt (Mu (ExpPower a x))))  | even x = opt $ Mu $ ExpPower a $ div x
 opt (Mu (ExpPower a 0)) = Mu $ ExpScalar 1.0
 opt (Mu (ExpPower a 1)) = opt a
 opt (Mu (ExpPower (Mu (ExpSqrt a)) x)) = opt $ Mu $ ExpPower a $ div x 2
+--efficient exponentiation
 
 opt (Mu a) = Mu $ fmap opt a
 

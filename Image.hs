@@ -8,44 +8,11 @@ import Codec.Picture
 import qualified Codec.Picture.Types as M
 import Control.Monad.ST
 import Control.Monad
-import System.Environment
-import Control.Applicative (liftA2)
 
 import Expr
 import Types as T
 import Utils
-
-runner :: [String] -> IO ()
-runner [pathFrom, pathTo, ext, transform] = do
-    inImage <- readImage pathFrom
-    case inImage of
-        Left err -> error ("Could not read image: " ++ err)
-        --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
-        Right img -> do
-            putStrLn $ "Transform: " ++ t
-            putStrLn $ "File Save format: " ++ ext
-            putStrLn $ "From File: \"" ++ pathFrom ++ "\""
-            putStrLn $ "Save Path: \"" ++ pathTo ++ "\""
-            (s . f . convertRGB8) img
-            where
-                t = case transform of
-                    "1" -> "inverseFisheyeTransform"
-                    "2" -> "fisheyeToPano"
-                    "3" -> "inversePanoToLittlePlanet"
-                    "4" -> "panoToLittlePlanet"
-                    _   -> error "Invalid transform option"
-                s = case ext of
-                    "png"   -> writePng pathTo
-                    "jpeg"  -> saveJpgImage 100 pathTo . ImageRGB8
-                    "tga"   -> writeTga pathTo
-                    _       -> error "Invalid extension"
-                f = case transform of
-                    "1" -> inverseFisheyeTransform
-                    "2" -> fisheyeToPano
-                    "3" -> inversePanoToLittlePlanet
-                    "4" -> panoToLittlePlanet
-                    _   -> error "Invalid transform option"
-    print "done"
+import Optimizer
 
 dynWidth :: DynamicImage -> Int
 dynWidth img = dynamicMap imageWidth img
