@@ -29,6 +29,7 @@ data Expr :: * -> * where
   ExpSqrt   :: t -> Expr t
   ExpAbs    :: t -> Expr t
   ExpSignum :: t -> Expr t
+  ExpNeg    :: t -> Expr t
   ExpAdd    :: t -> t -> Expr t
   ExpSub    :: t -> t -> Expr t
   ExpMul    :: t -> t -> Expr t
@@ -44,6 +45,8 @@ data Expr :: * -> * where
   ExpId     :: t -> Expr t
 
 deriving instance Show t => Show (Expr t)
+deriving instance Eq t => Eq (Expr t)
+deriving instance Ord t => Ord (Expr t)
 
 instance Functor Expr where
   fmap f (ExpScalar d) = ExpScalar d
@@ -55,6 +58,7 @@ instance Functor Expr where
   fmap f (ExpAtan t1) = ExpAtan (f t1)
   fmap f (ExpSqrt t1) = ExpSqrt (f t1)
   fmap f (ExpAbs t1) = ExpAbs (f t1)
+  fmap f (ExpNeg t1) = ExpNeg (f t1)
   fmap f (ExpSignum t1) = ExpSignum (f t1)
   fmap f (ExpAdd t1 t2) = ExpAdd (f t1) (f t2)
   fmap f (ExpSub t1 t2) = ExpSub (f t1) (f t2)
@@ -80,6 +84,7 @@ instance Foldable Expr where
   foldr f z (ExpSqrt t1) = f t1 z
   foldr f z (ExpAbs t1) = f t1 z
   foldr f z (ExpSignum t1) = f t1 z
+  foldr f z (ExpNeg t1) = f t1 z
   foldr f z (ExpAdd t1 t2) = f t1 (f t2 z)
   foldr f z (ExpSub t1 t2) = f t1 (f t2 z)
   foldr f z (ExpMul t1 t2) = f t1 (f t2 z)
@@ -104,6 +109,7 @@ instance Traversable Expr where
   traverse f (ExpSqrt t1) = ExpSqrt <$> f t1
   traverse f (ExpAbs t1) = ExpAbs <$> f t1
   traverse f (ExpSignum t1) = ExpSignum <$> f t1
+  traverse f (ExpNeg t1) = ExpNeg <$> f t1
   traverse f (ExpAdd t1 t2) = ExpAdd <$> f t1 <*> f t2
   traverse f (ExpSub t1 t2) = ExpSub <$> f t1 <*> f t2
   traverse f (ExpMul t1 t2) = ExpMul <$> f t1 <*> f t2
@@ -118,6 +124,9 @@ instance Traversable Expr where
   traverse _ _ = error "traverse"
 
 newtype Mu a = Mu (a (Mu a))
+
+instance Eq (Mu Expr) where
+    Mu a == Mu b = a == b
 
 instance Show (Mu Expr) where
   showsPrec d (Mu (ExpScalar n)) = shows n
@@ -251,6 +260,7 @@ instance Eval Value where
   eval (ExpSqrt (Double n)) = Double $ sqrt n
   eval (ExpAbs (Double n)) = Double $ abs n
   eval (ExpSignum (Double n)) = Double $ signum n
+  eval (ExpNeg (Double n)) = Double $ negate n
   eval (ExpTuple ns) = Tuple ns
   eval (ExpIfZero (Double z) a b)
     | nearZero z = a
@@ -296,9 +306,9 @@ instance (Var a, ToExpr b) => ToExpr (a -> b) where
           [ (t,n)
           | (t,ExpVar n) <- ys, n `elem` tmpVars
           ]
-    print (vars,[n..n'-1])
+--    print (vars,[n..n'-1])
     if length vars > length [n..n'-1]
-    then error "to many vars"
+    then error "too many vars"
     else do
       let scc = G.stronglyConnComp
             [ (n,n,foldr (:) [] e)
@@ -346,3 +356,23 @@ instance Show ExprFunction where
 
 nearZero :: Double -> Bool
 nearZero n = abs n < 1e-6
+
+num_pi :: Double
+num_pi = 3.141592653589793
+------------------------------------------------------------------------------
+
+newtype JavaScript = JavaScript ExprFunction
+
+instance Show JavaScript where
+  show (JavaScript (ExprFunction as xs r)) = unlines $
+      ["((" ++ show as ++ ") => {"] ++
+      map showAssign xs ++
+      [ "  return " ++ show r ++ ";"
+      , "})"
+      ]
+    where
+      showAssign (v,ExpScalar e) = "  let " ++ show v ++ " = " ++ show e ++ ";"
+      showAssign (v,ExpSin e) = "  let " ++ show v ++ " = Math.sin(" ++ show e ++ ");"
+      showAssign (v,ExpIfZero i t e) = "  let " ++ show v ++
+                 " = " ++ show i ++ "?" ++ show t ++ ":" ++ show e ++ ";"
+      showAssign (v,e) = "  // let " ++ show v ++ " = " ++ show e ++ ";"

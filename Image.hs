@@ -4,44 +4,15 @@ module Image where
 
 import Prelude hiding (atan2, asin, acos, atan, (^))
 import qualified Prelude as P
-import Debug.Trace
 import Codec.Picture
 import qualified Codec.Picture.Types as M
 import Control.Monad.ST
 import Control.Monad
-import System.Environment
-import Control.Applicative (liftA2)
 
 import Expr
 import Types as T
 import Utils
-
-runner :: [String] -> IO ()
-runner [pathFrom, pathTo, ext, transform] = do
-    inImage <- readImage pathFrom
-    --s :: Pixel a => Image a -> ByteString
-    --f :: ImageRGB8 -> ImageRGB8
-    case inImage of
-        Left err -> error ("Could not read image: " ++ err)
-        --Right img -> putStrLn $ "Height: " ++ show (dynHeight img) ++ " Width: " ++ show (dynWidth img)
-        Right img -> do
-            putStrLn $ "Transform: " ++ transform
-            putStrLn $ "File Save format: " ++ ext
-            putStrLn $ "Save Path: \"" ++ pathTo ++ "\""
-            putStrLn $ "From File: \"" ++ pathFrom ++ "\""
-            (s . f . convertRGB8) img
-            where
-                s = case ext of
-                    "png"   -> writePng pathTo
-                    "jpeg"  -> saveJpgImage 100 pathTo . ImageRGB8
-                    "tga"   -> writeTga pathTo
-                    _       -> error "Invalid extension"
-                f = case transform of
-                    "1" -> inverseFisheyeTransform
-                    "2" -> fisheyeToPano
-                    "3" -> inversePanoToLittlePlanet
-                    _   -> error "Invalid transform option"
-    print "done"
+import Optimizer
 
 dynWidth :: DynamicImage -> Int
 dynWidth img = dynamicMap imageWidth img
@@ -90,31 +61,33 @@ fisheyeToPano img@Image {..} = runST $ do
                     go (x + 1) y
     go 0 0
 
-panoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
-panoToLittlePlanet img@Image {..} = runST $ do
-    mimg <- M.newMutableImage imageWidth imageHeight
-    let go x y  | x >= imageWidth = go 0 $ y + 1
-                | y >= imageHeight = M.freezeImage mimg
-                | otherwise = do
-                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToStero (0,0) $ pixelCoordToLongLat imageHeight imageWidth (x,y)
-                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
-                        writePixel mimg x y $ PixelRGB8 0 0 0
-                    else
-                        writePixel mimg x' y' $ pixelAt img x y
-                    go (x + 1) y
-    go 0 0
-
 inversePanoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
 inversePanoToLittlePlanet img@Image {..} = runST $ do
     mimg <- M.newMutableImage imageWidth imageHeight
     let go x y  | x >= imageWidth = go 0 $ y + 1
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromSteroToLongLat (0,0) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromRectilinearToStereo (0,scalarToLat $ num_piS/2) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
                         writePixel mimg x y $ pixelAt img x' y'
+                    go (x + 1) y
+    go 0 0
+
+panoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
+panoToLittlePlanet img@Image {..} = runST $ do
+    let size = min imageWidth imageHeight
+    mimg <- M.newMutableImage size size
+    let go x y  | x >= size = go 0 $ y + 1
+                | y >= size = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ algebraicStereoThroughNeg1 (35/8) $ normalize size size (x,y)
+                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
+
                     go (x + 1) y
     go 0 0
 
@@ -129,23 +102,39 @@ type PixelCoord = (Int, Int)
 type Height = Int
 type Width = Int
 {-}
-opt :: (Num a, Eq a) => Expr a -> Expr a
-opt (ExpScalar a) = (ExpScalar a)
-opt (ExpSin (ExpScalar 0)) = ExpScalar 0
-opt (ExpSin (ExpScalar a)) = ExpSin a
-opt (ExpSin a) = opt $ ExpSin $ opt a
-opt (ExpCos (ExpScalar 0)) = ExpScalar 1.0
-opt (ExpCos (ExpScalar a)) = ExpCos a
-opt (ExpCos a) = opt $ ExpSin $ opt a
-opt (ExpMul (ExpScalar 0) _) = ExpScalar 0
-opt (ExpMul _ (ExpScalar 0)) = ExpScalar 0
-opt (ExpMul (ExpScalar 1) a) = ExpId $ opt a
-opt (ExpMul a (ExpScalar 1)) = ExpId $ opt a
---opt (ExpMul a b) = opt $ ExpMul (opt $ ExpId a) (opt $ ExpId b)
-opt (ExpDiv 0 _) = ExpScalar 0
-opt (ExpDiv _ 0) = error "Divide by Zero"
-opt (ExpDiv 0 0) = error "Zero over Zero"
-opt a = a -}
+inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
+inverseFisheyeTransform img@Image {..} = runST $ do
+    let size = min imageHeight imageWidth
+    mimg <- M.newMutableImage size size
+    let dx = (fromIntegral imageWidth) / 2
+    let dy = (fromIntegral imageHeight) / 2
+    let radius = (fromIntegral size) / 2
+    f :: Point2D -> Mu Expr
+    let f = fix opt $ toMuExpr $ longLatTo2D dy dx $ normFisheyeToLongLat (35/4) $ normalize radius radius
+    let go x y  | x >= size = go 0 $ y + 1
+                | y >= size = M.freezeImage mimg
+                | otherwise = do
+                    let (x1,y1) = normalize' size size (x,y)
+                    if (x1*x1 + y1*y1) <= 1.0 then do
+                        let (x',y') = (\(a,b) -> (floor a, floor b)) $ extractTuple $ evalMu $ f (fromIntegral x, fromIntegral y)
+                        if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                            writePixel mimg x y $ PixelRGB8 0 0 0
+                        else
+                            writePixel mimg x y $ pixelAt img x' y'
+                    else
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    go (x + 1) y
+    go 0 0
+
+normalize :: Scalar -> Scalar -> Point2D -> Point2D
+normalize dx dy = translate (-1) 1 . scale (1 / dx) ((-1) / dy)
+
+unnormalize :: Scalar -> Scalar -> Point2D -> Point2D
+unnormalize dx dy = scale dx (-dy) . translate 1 (-1)
+
+longLatTo2D :: Scalar -> Scalar -> (Longitude, Latitude) -> Point2D
+longLatTo2D h w (ll, la) = unnormalize h w $ scale (1/num_pi) (2/num_pi) (longToScalar ll, latToScalar la) --filterBadBoys (x/pi, y*2/pi)
+-}
 
 normalize :: Height -> Width -> PixelCoord -> Point2D
 normalize h w (x,y) = (x', y')
@@ -197,6 +186,12 @@ normFisheyeToLongLat ap (x,y) = pointToLongLat (p_x, p_y, p_z)
         p_x = (T.sin a) * x / r
         p_y = T.cos a
         p_z = (T.sin a) * y / r
+
+--Projection plane at (-1), essentially an equivalent val
+projStereoNeg1ToLongLat :: (Longitude, Latitude) -> (Longitude, Latitude)
+projStereoNeg1ToLongLat (long, lat) = ((scalarToLong c) * long, (scalarToLat c) * lat)
+    where
+        c = (1 - T.sin lat) / 2
 {-}
 normFisheyeToPoint' :: Double -> Double2D -> (Double, Double, Double)
 normFisheyeToPoint' ap (x,y) = (p_x, p_y, p_z)
@@ -232,7 +227,7 @@ equiRecToFisheye (x,y) = Fisheye r t
                 False -> 0 :: Radian-}
 
 longLatDoubleToPixelCoord :: Int -> Int -> Double2D -> PixelCoord
-longLatDoubleToPixelCoord h w (x,y) = unnormalize h w $ filterBadBoys (x/pi, y*2/pi)
+longLatDoubleToPixelCoord h w (x,y) = unnormalize h w  (x/pi, y*2/pi)--filterBadBoys (x/pi, y*2/pi)
 
 -- if the abs (x,y) > 1 then put the point in teh top left corner, otherwise continue
 filterBadBoys :: Double2D -> Double2D
