@@ -356,3 +356,21 @@ instance Show ExprFunction where
 
 nearZero :: Double -> Bool
 nearZero n = abs n < 1e-6
+
+------------------------------------------------------------------------------
+
+newtype JavaScript = JavaScript ExprFunction
+
+instance Show JavaScript where
+  show (JavaScript (ExprFunction as xs r)) = unlines $
+      ["((" ++ show as ++ ") => {"] ++
+      map showAssign xs ++
+      [ "  return " ++ show r ++ ";"
+      , "})"
+      ]
+    where
+      showAssign (v,ExpScalar e) = "  let " ++ show v ++ " = " ++ show e ++ ";"
+      showAssign (v,ExpSin e) = "  let " ++ show v ++ " = Math.sin(" ++ show e ++ ");"
+      showAssign (v,ExpIfZero i t e) = "  let " ++ show v ++
+                 " = " ++ show i ++ "?" ++ show t ++ ":" ++ show e ++ ";"
+      showAssign (v,e) = "  // let " ++ show v ++ " = " ++ show e ++ ";"
