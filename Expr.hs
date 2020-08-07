@@ -306,7 +306,7 @@ instance (Var a, ToExpr b) => ToExpr (a -> b) where
           [ (t,n)
           | (t,ExpVar n) <- ys, n `elem` tmpVars
           ]
-    print (vars,[n..n'-1])
+--    print (vars,[n..n'-1])
     if length vars > length [n..n'-1]
     then error "too many vars"
     else do
@@ -359,3 +359,20 @@ nearZero n = abs n < 1e-6
 
 num_pi :: Double
 num_pi = 3.141592653589793
+------------------------------------------------------------------------------
+
+newtype JavaScript = JavaScript ExprFunction
+
+instance Show JavaScript where
+  show (JavaScript (ExprFunction as xs r)) = unlines $
+      ["((" ++ show as ++ ") => {"] ++
+      map showAssign xs ++
+      [ "  return " ++ show r ++ ";"
+      , "})"
+      ]
+    where
+      showAssign (v,ExpScalar e) = "  let " ++ show v ++ " = " ++ show e ++ ";"
+      showAssign (v,ExpSin e) = "  let " ++ show v ++ " = Math.sin(" ++ show e ++ ");"
+      showAssign (v,ExpIfZero i t e) = "  let " ++ show v ++
+                 " = " ++ show i ++ "?" ++ show t ++ ":" ++ show e ++ ";"
+      showAssign (v,e) = "  // let " ++ show v ++ " = " ++ show e ++ ";"
