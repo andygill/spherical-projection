@@ -306,7 +306,7 @@ instance (Var a, ToExpr b) => ToExpr (a -> b) where
           [ (t,n)
           | (t,ExpVar n) <- ys, n `elem` tmpVars
           ]
-    print (vars,[n..n'-1])
+--    print (vars,[n..n'-1])
     if length vars > length [n..n'-1]
     then error "to many vars"
     else do
