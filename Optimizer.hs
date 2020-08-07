@@ -36,11 +36,18 @@ opt (Mu (ExpSin (Mu (ExpScalar  0)))) = Mu $ ExpScalar 0
 opt (Mu (ExpSin (Mu (ExpAsin    a)))) = opt a
 
 opt (Mu (ExpAsin(Mu (ExpSin     a)))) = opt a
+opt (Mu (ExpAsin(Mu (ExpScalar  1)))) = Mu $ ExpScalar $ num_pi / 2
+opt (Mu (ExpAsin(Mu (ExpScalar  (-1))))) = Mu $ ExpScalar $ (-num_pi) / 2
+opt (Mu (ExpAsin(Mu (ExpScalar  0)))) = Mu $ ExpScalar 0
+
 
 opt (Mu (ExpCos (Mu (ExpScalar  0)))) = Mu $ ExpScalar 1.0
 opt (Mu (ExpCos (Mu (ExpAcos    a)))) = opt a
 
 opt (Mu (ExpAcos(Mu (ExpCos     a)))) = opt a
+opt (Mu (ExpAcos(Mu (ExpScalar  1)))) = Mu $ ExpScalar 0
+opt (Mu (ExpAcos(Mu (ExpScalar  (-1))))) = Mu $ ExpScalar num_pi
+opt (Mu (ExpAcos(Mu (ExpScalar  0)))) = Mu $ ExpScalar $ num_pi / 2
 
 opt (Mu (ExpMul (Mu (ExpScalar 0)) _)) = Mu $ ExpScalar 0
 opt (Mu (ExpMul _ (Mu (ExpScalar 0)))) = Mu $ ExpScalar 0
@@ -73,8 +80,8 @@ opt (Mu (ExpSqrt (Mu (ExpPower a x))))  | even x = opt $ Mu $ ExpPower a $ div x
 
 opt (Mu (ExpPower a 0)) = Mu $ ExpScalar 1.0
 opt (Mu (ExpPower a 1)) = opt a
-opt (Mu (ExpPower (Mu (ExpSqrt a)) x)) = opt $ Mu $ ExpPower a $ div x 2
---efficient exponentiation
+opt (Mu (ExpPower (Mu (ExpSqrt a)) x))  | even x = opt $ Mu $ ExpPower a $ div x 2
+                                        | otherwise = Mu $ ExpPower (Mu $ ExpSqrt $ opt a) x
 
 opt (Mu a) = Mu $ fmap opt a
 

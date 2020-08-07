@@ -209,6 +209,9 @@ toScalar (Radian x) = Scalar x
 
 latToScalar (Latitude x) = toScalar x
 longToScalar (Longitude x) = toScalar x
+
+num_piS :: Scalar
+num_piS = Scalar $ Mu $ ExpScalar $ num_pi
 ------------------------------------------------------------------------------
 
 -- Rectilinear projection

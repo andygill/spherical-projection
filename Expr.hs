@@ -308,7 +308,7 @@ instance (Var a, ToExpr b) => ToExpr (a -> b) where
           ]
     print (vars,[n..n'-1])
     if length vars > length [n..n'-1]
-    then error "to many vars"
+    then error "too many vars"
     else do
       let scc = G.stronglyConnComp
             [ (n,n,foldr (:) [] e)
@@ -356,3 +356,6 @@ instance Show ExprFunction where
 
 nearZero :: Double -> Bool
 nearZero n = abs n < 1e-6
+
+num_pi :: Double
+num_pi = 3.141592653589793

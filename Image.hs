@@ -67,7 +67,7 @@ inversePanoToLittlePlanet img@Image {..} = runST $ do
     let go x y  | x >= imageWidth = go 0 $ y + 1
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromRectilinearToStereo (0,scalarToLat $ num_pi/2) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromRectilinearToStereo (0,scalarToLat $ num_piS/2) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
@@ -101,6 +101,40 @@ type Double2D = (Double,Double)
 type PixelCoord = (Int, Int)
 type Height = Int
 type Width = Int
+{-}
+inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
+inverseFisheyeTransform img@Image {..} = runST $ do
+    let size = min imageHeight imageWidth
+    mimg <- M.newMutableImage size size
+    let dx = (fromIntegral imageWidth) / 2
+    let dy = (fromIntegral imageHeight) / 2
+    let radius = (fromIntegral size) / 2
+    f :: Point2D -> Mu Expr
+    let f = fix opt $ toMuExpr $ longLatTo2D dy dx $ normFisheyeToLongLat (35/4) $ normalize radius radius
+    let go x y  | x >= size = go 0 $ y + 1
+                | y >= size = M.freezeImage mimg
+                | otherwise = do
+                    let (x1,y1) = normalize' size size (x,y)
+                    if (x1*x1 + y1*y1) <= 1.0 then do
+                        let (x',y') = (\(a,b) -> (floor a, floor b)) $ extractTuple $ evalMu $ f (fromIntegral x, fromIntegral y)
+                        if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                            writePixel mimg x y $ PixelRGB8 0 0 0
+                        else
+                            writePixel mimg x y $ pixelAt img x' y'
+                    else
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    go (x + 1) y
+    go 0 0
+
+normalize :: Scalar -> Scalar -> Point2D -> Point2D
+normalize dx dy = translate (-1) 1 . scale (1 / dx) ((-1) / dy)
+
+unnormalize :: Scalar -> Scalar -> Point2D -> Point2D
+unnormalize dx dy = scale dx (-dy) . translate 1 (-1)
+
+longLatTo2D :: Scalar -> Scalar -> (Longitude, Latitude) -> Point2D
+longLatTo2D h w (ll, la) = unnormalize h w $ scale (1/num_pi) (2/num_pi) (longToScalar ll, latToScalar la) --filterBadBoys (x/pi, y*2/pi)
+-}
 
 normalize :: Height -> Width -> PixelCoord -> Point2D
 normalize h w (x,y) = (x', y')
