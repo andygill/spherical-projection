@@ -8,7 +8,6 @@ module Main where
 
 import Data.Dynamic
 import Data.Reify
-import Debug.Trace
 import System.Environment
 import Codec.Picture
 
@@ -36,6 +35,7 @@ main = do
                     "2" -> "fisheyeToPano"
                     "3" -> "inversePanoToLittlePlanet"
                     "4" -> "panoToLittlePlanet"
+                    "5" -> "panoToGnomic"
                     _   -> error "Invalid transform option"
                 s = case ext of
                     "png"   -> writePng pathTo
@@ -47,5 +47,6 @@ main = do
                     "2" -> fisheyeToPano
                     "3" -> inversePanoToLittlePlanet
                     "4" -> panoToLittlePlanet
+                    "5" -> panoToGnomic
                     _   -> error "Invalid transform option"
     print "done"

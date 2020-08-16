@@ -40,6 +40,7 @@ data Expr :: * -> * where
   ExpRectilinear :: t -> t -> Expr t
   ExpFisheye :: t -> t -> Expr t
   ExpIfZero :: t -> t -> t -> Expr t
+  ExpNorm   :: [t] -> Expr t
   ExpTuple  :: [t] -> Expr t
   ExpVar    :: Int -> Expr t
   ExpId     :: t -> Expr t
@@ -71,6 +72,7 @@ instance Functor Expr where
   fmap f (ExpRectilinear t1 t2) = ExpRectilinear (f t1) (f t2)
   fmap f (ExpFisheye t1 t2) = ExpFisheye (f t1) (f t2)
   fmap f (ExpIfZero t1 t2 t3) = ExpIfZero (f t1) (f t2) (f t3)
+  fmap f (ExpNorm ts) = ExpNorm $ fmap f ts
   fmap f (ExpTuple ts) = ExpTuple $ fmap f ts
   fmap f g = error $ show ("fmap" )
 instance Foldable Expr where
@@ -94,6 +96,7 @@ instance Foldable Expr where
   foldr f z (ExpRectilinear t1 t2) = f t1 (f t2 z)
   foldr f z (ExpFisheye t1 t2) = f t1 (f t2 z)
   foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
+  foldr f z (ExpNorm ts) = foldr f z ts
   foldr f z (ExpTuple ts) = foldr f z ts
   foldr f z (ExpVar _) = z
   foldr f z _ = error "foldr"
@@ -120,6 +123,7 @@ instance Traversable Expr where
   traverse f (ExpFisheye t1 t2) = ExpFisheye <$> f t1 <*> f t2
   traverse f (ExpIfZero t1 t2 t3) = ExpIfZero <$> f t1 <*> f t2 <*> f t3
   traverse f (ExpVar i) = pure $ ExpVar i
+  traverse f (ExpNorm ts) = ExpNorm <$> traverse f ts
   traverse f (ExpTuple ts) = ExpTuple <$> traverse f ts
   traverse _ _ = error "traverse"
 
@@ -130,6 +134,8 @@ instance Eq (Mu Expr) where
 
 instance Show (Mu Expr) where
   showsPrec d (Mu (ExpScalar n)) = shows n
+  showsPrec d (Mu (ExpVar t)) = showParen (d > 10) $
+      showString "Var " . showsPrec 11 t
   showsPrec d (Mu (ExpSin t)) = showParen (d > 10) $
       showString "sin " . showsPrec 11 t
   showsPrec d (Mu (ExpCos t)) = showParen (d > 10) $
@@ -180,8 +186,10 @@ instance Show (Mu Expr) where
       showsPrec 11 b .
       showString " " .
       showsPrec 11 c
+  showsPrec d (Mu (ExpNorm as)) = showParen (d > 10) $
+      showString "norm " .
+      showsPrec 11 as
   showsPrec d (Mu (ExpTuple as)) = showParen (d > 10) $
-      showString "ifZero " .
       showsPrec 11 as
   showsPrec d (Mu (ExpRectilinear{})) = showString "Rectilinear"
   showsPrec d (Mu (ExpFisheye{})) = showString "Fisheye"
@@ -241,6 +249,7 @@ class Eval e where
 data Value where
   Double :: Double -> Value
   Tuple  :: [Value] -> Value
+  Fail   :: String -> Value
   deriving Show
 
 instance Eval Value where
@@ -261,13 +270,14 @@ instance Eval Value where
   eval (ExpAbs (Double n)) = Double $ abs n
   eval (ExpSignum (Double n)) = Double $ signum n
   eval (ExpNeg (Double n)) = Double $ negate n
+  eval (ExpNorm ns) = Double $ sqrt $ foldr ((+) . (P.^2)) 0 $ map (\ (Double x)-> x) ns
   eval (ExpTuple ns) = Tuple ns
   eval (ExpIfZero (Double z) a b)
     | nearZero z = a
     | otherwise  = b
   eval (ExpRectilinear a b) = Tuple [a,b]
   eval (ExpFisheye a b) = Tuple [a,b]
-  eval other = error (show other)
+  eval other = Fail (show other)
 
 evalMu :: Mu Expr -> Value
 evalMu (Mu e) = eval $ fmap evalMu e
@@ -332,6 +342,20 @@ instance (ToMuExpr a, ToMuExpr b) => ToExpr (a,b) where
 instance (ToMuExpr a, ToMuExpr b) => ToMuExpr (a,b) where
   toMuExpr (a,b) = Mu $ ExpTuple [toMuExpr a, toMuExpr b]
 
+instance (ToMuExpr a, ToMuExpr b, ToMuExpr c) => ToExpr (a,b,c) where
+  reifyToExprFunction n (a,b,c) =
+    reifyToExprFunction n $ Mu $ ExpTuple [toMuExpr a, toMuExpr b, toMuExpr c]
+
+instance (ToMuExpr a, ToMuExpr b, ToMuExpr c) => ToMuExpr (a,b,c) where
+  toMuExpr (a,b,c) = Mu $ ExpTuple [toMuExpr a, toMuExpr b, toMuExpr c]
+
+instance (ToMuExpr a) => ToExpr [a] where
+    reifyToExprFunction n as =
+        reifyToExprFunction n $ Mu $ ExpTuple $ map toMuExpr as
+
+instance (ToMuExpr a) => ToMuExpr [a] where
+    toMuExpr as = Mu $ ExpTuple $ map toMuExpr as
+
 newtype V = V Int
   deriving (Eq, Ord)
 
@@ -378,6 +402,7 @@ instance Show JavaScript where
     where
       showAssign (v,ExpScalar e)    = "  let " ++ show v ++ " = " ++ show e ++ ";"
       showAssign (v,ExpTuple es)    = "  let " ++ show v ++ " = " ++ show es ++ ";"
+      showAssign (v,ExpNorm es)     = "  let " ++ show v ++ " = Math.hypot(" ++ (init (tail (show es))) ++ ");"
       showAssign (v,ExpSin e)       = "  let " ++ show v ++ " = Math.sin(" ++ show e ++ ");"
       showAssign (v,ExpCos e)       = "  let " ++ show v ++ " = Math.cos(" ++ show e ++ ");"
       showAssign (v,ExpTan e)       = "  let " ++ show v ++ " = Math.tan(" ++ show e ++ ");"
@@ -402,6 +427,10 @@ instance Show JavaScript where
 
 newtype Haskell = Haskell ExprFunction
 
+normListToString :: Int -> [V] -> String
+normListToString n [] = ""
+normListToString n (x:xs) = (show x) ++ "*" ++ (show x) ++ if n == 1 then "" else " + " ++ (normListToString (n-1) xs)
+
 instance Show Haskell where
   show (Haskell (ExprFunction as xs r)) = unlines $
       ["(\\(" ++ (listToTuple as) ++ ") -> do "] ++
@@ -410,6 +439,7 @@ instance Show Haskell where
     where
       showAssign (v,ExpScalar e)    = "  let " ++ show v ++ " = " ++ show e
       showAssign (v,ExpTuple es)    = "  let " ++ show v ++ " = (" ++ listToTuple es ++ ")"
+      showAssign (v,ExpNorm es)     = "  let " ++ show v ++ " = sqrt $ " ++ (normListToString (length es) es) ++ ";"
       showAssign (v,ExpSin e)       = "  let " ++ show v ++ " = sin " ++ show e
       showAssign (v,ExpCos e)       = "  let " ++ show v ++ " = cos " ++ show e
       showAssign (v,ExpTan e)       = "  let " ++ show v ++ " = tan " ++ show e

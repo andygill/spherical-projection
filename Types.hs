@@ -179,7 +179,54 @@ instance Math Latitude where
   asin = Latitude . asin
   acos = Latitude . acos
   atan2 y x = Latitude $ atan2 y x
+{-}
+newtype Norm where
+    Norm :: Mu Expr -> Norm
 
+-- Expressions can be radians
+instance Show Norm where
+  showsPrec d (Norm es) = showsPrec d es
+
+instance Num Norm where
+  Norm r1 + Norm r2 = Norm $ Mu $ ExpAdd r1 r2
+  Norm r1 - Norm r2 = Norm $ Mu $ ExpSub r1 r2
+  Norm r1 * Norm r2 = Norm $ Mu $ ExpMul r1 r2
+  fromInteger = Norm . Mu . ExpNorm . map fromInteger
+
+instance Math Norm where
+  sin (Norm r) = Scalar $ Mu $ ExpSin r
+  cos (Norm r) = Scalar $ Mu $ ExpCos r
+  asin (Norm s) = Radian $ Mu $ ExpAsin s
+  acos (Norm s) = Radian $ Mu $ ExpAcos s
+  atan (Norm s) = Radian $ Mu $ ExpAtan s
+  atan2 (Norm y) (Norm x) = Radian $ Mu $ ExpAtan2 y x
+
+instance Floating Norm where
+    sqrt (Norm n) = Norm (Mu $ ExpSqrt n)
+
+instance Var Norm where
+  mkVar = singletonVar (Norm . Mu . ExpVar)
+
+instance ToMuExpr Norm where
+  toMuExpr (Norm a) = a
+
+instance MuRef Norm where
+    type DeRef Norm = Expr
+    mapDeRef f (Norm s) = mapDeRef f s
+
+instance Body Norm where
+    maxVar (Norm e) = maxVar e
+
+evalNorm :: Norm -> Value
+evalNorm (Norm e) = evalMu e
+
+instance (ToMuExpr a) => ToExpr [a] where
+  reifyToExprFunction n as =
+    reifyToExprFunction n $ Mu $ ExpNorm $ map toMuExpr as
+
+instance (ToMuExpr a) => ToMuExpr [a] where
+  toMuExpr as = Mu $ ExpNorm $ map toMuExpr as
+-}
 -- A Point on a unit sphere
 type Point = (Scalar, Scalar, Scalar)
 

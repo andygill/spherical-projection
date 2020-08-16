@@ -91,6 +91,22 @@ panoToLittlePlanet img@Image {..} = runST $ do
                     go (x + 1) y
     go 0 0
 
+panoToGnomic :: Image PixelRGB8 -> Image PixelRGB8
+panoToGnomic img@Image {..} = runST $ do
+    let big = max imageWidth imageHeight
+    let small = min imageWidth imageHeight
+    mimg <- M.newMutableImage small big
+    let go x y  | x >= small = go 0 $ y + 1
+                | y >= big = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromRecilinear (0,0) $ point2DtoRectilinear $ normalize imageHeight imageWidth (x,y)
+                    if x' >= small || x' < 0 || y' >= big || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
+                    go (x + 1) y
+    go 0 0
+
 extractTuple :: Value -> (Double, Double)
 extractTuple t = case t of Tuple [Double x, Double y] -> (x,y)
 
