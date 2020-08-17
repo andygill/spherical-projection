@@ -69,6 +69,7 @@ instance Functor Expr where
   fmap f (ExpAtan2 t1 t2) = ExpAtan2 (f t1) (f t2)
   fmap f (ExpLambda vs t) = ExpLambda vs (f t)
   fmap f (ExpVar i) = ExpVar i
+  fmap f (ExpId t1) = ExpId (f t1)
   fmap f (ExpRectilinear t1 t2) = ExpRectilinear (f t1) (f t2)
   fmap f (ExpFisheye t1 t2) = ExpFisheye (f t1) (f t2)
   fmap f (ExpIfZero t1 t2 t3) = ExpIfZero (f t1) (f t2) (f t3)
@@ -98,6 +99,7 @@ instance Foldable Expr where
   foldr f z (ExpIfZero t1 t2 t3) = f t1 (f t2 (f t3 z))
   foldr f z (ExpNorm ts) = foldr f z ts
   foldr f z (ExpTuple ts) = foldr f z ts
+  foldr f z (ExpId t1) = f t1 z
   foldr f z (ExpVar _) = z
   foldr f z _ = error "foldr"
 
@@ -123,6 +125,7 @@ instance Traversable Expr where
   traverse f (ExpFisheye t1 t2) = ExpFisheye <$> f t1 <*> f t2
   traverse f (ExpIfZero t1 t2 t3) = ExpIfZero <$> f t1 <*> f t2 <*> f t3
   traverse f (ExpVar i) = pure $ ExpVar i
+  traverse f (ExpId t1) = ExpId <$> f t1
   traverse f (ExpNorm ts) = ExpNorm <$> traverse f ts
   traverse f (ExpTuple ts) = ExpTuple <$> traverse f ts
   traverse _ _ = error "traverse"

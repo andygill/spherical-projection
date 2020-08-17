@@ -11,7 +11,7 @@ import Data.Reify
 import System.Environment
 import Codec.Picture
 
-import Prelude hiding (sin, cos, atan2, (^))
+import Prelude hiding (asin, acos, atan, tan, sin, cos, atan2, (^))
 import qualified Prelude as P
 
 import Image
@@ -32,7 +32,7 @@ main = do
             where
                 t = case transform of
                     "1" -> "inverseFisheyeTransform"
-                    "2" -> "fisheyeToPano"
+                    "2" -> "unFisheye"
                     "3" -> "inversePanoToLittlePlanet"
                     "4" -> "panoToLittlePlanet"
                     "5" -> "panoToGnomic"
@@ -44,7 +44,7 @@ main = do
                     _       -> error "Invalid extension"
                 f = case transform of
                     "1" -> inverseFisheyeTransform
-                    "2" -> fisheyeToPano
+                    "2" -> unFisheye
                     "3" -> inversePanoToLittlePlanet
                     "4" -> panoToLittlePlanet
                     "5" -> panoToGnomic
