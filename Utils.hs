@@ -35,8 +35,8 @@ toRecilinear (phi_1,lam_0) (phi,lam) =
 
 -- 3D to fisheye http://paulbourke.net/dome/dualfish2sphere/
 -- f is the camera's aperature
-fromLongLatToFisheye :: Scalar -> (Longitude, Latitude) -> Fisheye
-fromLongLatToFisheye f ll = Fisheye r t
+fromLongLatToFisheyePt :: Scalar -> (Longitude, Latitude) -> (Scalar, Scalar)
+fromLongLatToFisheyePt f ll = (r * cos t, r * sin t)
     where
         (x,y,z) = (longLatToPoint ll) :: Point
         t = atan2 z x :: Radian

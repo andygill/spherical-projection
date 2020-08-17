@@ -116,59 +116,88 @@ fromMu (Mu e) vs' = do
 argList :: Expr V -> [V]
 argList = foldr (:) []
 
+notExpId:: Expr V -> Bool
+notExpId (ExpId _)= False
+notExpId _        = True
+
+checkNode :: V -> V -> [(V, Expr V)] -> [(V, Expr V)]
+checkNode v_0 v1 xs = map (\(m,expr) -> (m, fmap (\n -> if n == v_0 then v1 else n) expr)) xs
+
+replaceInstances :: [(V, Expr V)] -> [(V, Expr V)] -> [(V, Expr V)]
+replaceInstances [] xs = xs
+replaceInstances ((v_0, ExpId v1):ys) xs = replaceInstances ys $ checkNode v_0 v1 xs
+replaceInstances (y:ys) xs = replaceInstances ys xs
+
+removePointerNodes :: [(V, Expr V)] -> [(V, Expr V)]
+removePointerNodes ns = filter (notExpId . snd) $ replaceInstances ns ns
+
+-- Clean up leaves and inner workings
+cleanExpr :: ExprFunction -> ExprFunction
+cleanExpr (ExprFunction as vs r) = (ExprFunction as vs r)
+
 muConversion :: V -> ExprFunction -> ExprFunction
 muConversion (V n) (ExprFunction as vs r) = if n <= 0
     then
         -- run ExpId filter
-        ExprFunction as vs r
+        cleanExpr $ ExprFunction as vs r
     else do
-        let v = findNode vs (V n)
-        case v of
-            ExpScalar _ -> muConversion (V $ n-1) $ ExprFunction as vs r
-            ExpVar _ -> muConversion (V $ n-1) $ ExprFunction as vs r
-            ExpId _ -> muConversion (V $ n-1) $ ExprFunction as vs r
-            _           -> do
-                let l = argList v
-                --let args = map (Mu . fmap (Mu . ExpVar) . findNode vs) l
-                let args = map (Mu . fmap (\(V x) -> Mu $ ExpVar x) . findNode vs) l
-                let m = if length l == 1
-                    then
-                        Mu $ fmap (\_ -> args !! 0) v
-                    else
-                        Mu $ fmap (\x-> case L.elemIndex x l of Just i -> args !! i) v
-                let o = opt m
-                if m == o then
-                    muConversion (V $ n-1) $ ExprFunction as vs r
-                else do
-                    let unMu x = case x of (Mu a) -> a
-                    let o' = foldr (:) [] $ fmap (fmap unMu . unMu) $ unMu o--if (length $ foldr (:) [] $ unMu o) == 1 then (unMu o):[] else traverse unMu o
-
-                    case o' of
-                        (ExpVar x):[] -> muConversion (V $ n-1) $ ExprFunction as (findAndUpdate (V n) (ExpId (V x)) vs) r
-                        _ -> do
-                            let l' = map (fmap (\(ExpVar x)-> V x)) o'
-                            let swap_vs = map T.swap vs
-                            let l'' = rev_find (1 + length vs) l'
-                                    where
-                                        rev_find :: Int -> [Expr V] -> [(V, Expr V)]
-                                        rev_find _ [] = []
-                                        rev_find vNew (e:es) = case lookup e swap_vs of
-                                            Nothing -> (V vNew, e) : (rev_find (vNew + 1) es)
-                                            Just v -> (v,e) : (rev_find vNew es)
-                            let l''' = map fst l''
-                            let vs' = foldr (:) vs $ filter (\((V x),e) -> x >= length vs) l''
-                            let v' = if length l /= length l' then
-                                        if length l''' == 1 then
-                                            ExpId $ l''' !! 0
+        case lookup (V n) vs of
+            Nothing ->  muConversion (V $ n-1) $ ExprFunction as vs r
+            Just v -> case v of
+                ExpScalar _ -> muConversion (V $ n-1) $ ExprFunction as vs r
+                ExpVar _ -> muConversion (V $ n-1) $ ExprFunction as vs r
+                _           -> do
+                    let l = argList v
+                    --let args = map (Mu . fmap (Mu . ExpVar) . findNode vs) l
+                    let args = map (Mu . fmap (\(V x) -> Mu $ ExpVar x) . findNode vs) l
+                    let m = if length l == 1
+                        then
+                            Mu $ fmap (\_ -> args !! 0) v
+                        else
+                            Mu $ fmap (\x-> case L.elemIndex x l of Just i -> args !! i) v
+                    let o = opt m
+                    if m == o then
+                        muConversion (V $ n-1) $ ExprFunction as vs r
+                    else do
+                        let unMu x = case x of (Mu a) -> a
+                        let o' = if os == 0
+                            then
+                                 (unMu o):[]
+                            else
+                                foldr ((:) . unMu) [] $ unMu o
+                                where
+                                    os = length $ foldr (:) [] $ unMu o
+                        case o' of
+                            ((ExpVar x):[]) -> ExprFunction as (removePointerNodes $ findAndUpdate (V n) (ExpId (V x)) vs) r
+                            ((ExpScalar c):[]) -> muConversion (V $ n-1) $ ExprFunction as (removePointerNodes ns) r
+                                            where
+                                                ns = findAndUpdate (V n) (ExpId x) vs
+                                                x = case lookup (ExpScalar c) $ map T.swap vs of Just v -> v
+                            _ -> do
+                                let l' = map (fmap (\(Mu (ExpVar x))-> V x)) o'
+                                let swap_vs = map T.swap vs
+                                let l'' = rev_find (1 + length vs) l'
+                                        where
+                                            rev_find :: Int -> [Expr V] -> [(V, Expr V)]
+                                            rev_find _ [] = []
+                                            rev_find vNew (e:es) = case lookup e swap_vs of
+                                                Nothing -> (V vNew, e) : (rev_find (vNew + 1) es)
+                                                Just v -> (v,e) : (rev_find vNew es)
+                                let l''' = map fst l''
+                                let vs' = foldr (:) vs $ filter (\((V x),e) -> x >= length vs) l''
+                                let v' = if length l /= length l' then
+                                            if length l''' == 1 then
+                                                ExpId $ l''' !! 0
+                                            else
+                                                -- addition and multiplication changes
+                                                error "idk"--fmap (\x-> case L.elemIndex x l of Just i -> l''' !! i) v
                                         else
-                                            error "idk"--fmap (\x-> case L.elemIndex x l of Just i -> l''' !! i) v
-                                    else
-                                        if length l''' == 1 then
-                                            fmap (\_ -> l''' !! 0) v
-                                        else
-                                            fmap (\x-> case L.elemIndex x l of Just i -> l''' !! i) v
-
-                            muConversion (V $ n-1) $ ExprFunction as (findAndUpdate (V n) v' vs') r
+                                            if length l''' == 1 then
+                                                fmap (\_ -> l''' !! 0) v
+                                            else
+                                                fmap (\x-> case L.elemIndex x l of Just i -> l''' !! i) v
+                                let vs'' = removePointerNodes $ findAndUpdate (V n) v' vs'
+                                muConversion (V $ n-1) $ ExprFunction as vs'' r
 
 
 
