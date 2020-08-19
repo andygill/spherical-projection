@@ -18,7 +18,7 @@ import Image
 import qualified Data.Graph as G
 
 main = do
-    [pathFrom, pathTo, ext, transform] <- getArgs
+    [ext, transform, pathFrom, pathTo] <- getArgs
     inImage <- readImage pathFrom
     case inImage of
         Left err -> error ("Could not read image: " ++ err)

@@ -49,15 +49,18 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                     go (x + 1) y
     go 0 0
 
-unFisheye :: Pixel a => Image a -> Image a
+unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
     mimg <- M.newMutableImage size size
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (8/2.8)$ (\(x,y) -> (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
-                    writePixel mimg x y $ pixelAt img x' y'
+                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (4/2.8) $ (\(x,y) -> (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
+                    if x' >= size || x' < 0 || y' >= size || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
                     go (x + 1) y
     go 0 0
 
