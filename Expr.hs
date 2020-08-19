@@ -250,7 +250,7 @@ class Eval e where
 
 -- The universal type, a number or a structure.
 data Value where
-  Double :: Double -> Value
+  Double :: Double  -> Value
   Tuple  :: [Value] -> Value
   Fail   :: String -> Value
   deriving Show
@@ -280,7 +280,7 @@ instance Eval Value where
     | otherwise  = b
   eval (ExpRectilinear a b) = Tuple [a,b]
   eval (ExpFisheye a b) = Tuple [a,b]
-  eval other = Fail (show other)
+  eval a = Fail $ "unknown"
 
 evalMu :: Mu Expr -> Value
 evalMu (Mu e) = eval $ fmap evalMu e
@@ -370,7 +370,7 @@ data ExprFunction =
     [V]           -- inputs, as a list of scalars
     [(V,Expr V)]  -- static assignments, in lexigraphical order
     V             -- result, might be a vector
---  deriving Show
+  deriving Eq --Show
 
 
 instance Show ExprFunction where
