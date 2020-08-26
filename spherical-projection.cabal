@@ -24,7 +24,8 @@ executable spherical-projection
                        Props,
                        Utils,
                        Image,
-                       Optimizer
+                       Optimizer,
+                       CodeGen
   -- other-extensions:
   build-depends:       base >=4.12,
                        data-reify,
