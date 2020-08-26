@@ -85,7 +85,7 @@ panoToLittlePlanet img@Image {..} = runST $ do
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ algebraicStereoThroughNeg1 (35/8) $ normalize size size (x,y)
+                    let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ algebraicStereoThroughNeg1 (35/2) $ normalize size size (x,y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
