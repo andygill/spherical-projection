@@ -142,12 +142,11 @@ removeParameterNodes ((V x):ps) ns  = removeParameterNodes ps $ L.delete ((V x),
 
 -- Clean up leaves and inner workings
 cleanExpr :: ExprFunction -> ExprFunction
-cleanExpr (ExprFunction as vs r) = ExprFunction as' vs' (V r')
+cleanExpr (ExprFunction as vs r) = ExprFunction as vs' (V r')
     where
         snd_vs = map snd vs
-        r'  = foldr (\(V x)-> min x) (length vs) (as ++ (map fst vs))
+        r'  = foldr (\(V x)-> min x) (length vs + length as) (as ++ (map fst vs))
         isUsed x = foldr (||) False $ map (foldr ((||) . (==x)) False) snd_vs
-        as' = filter isUsed as
         vs' = filter (\(v,_) -> isUsed v || (V r') == v) vs
 
 muConversion :: V -> ExprFunction -> ExprFunction
@@ -202,15 +201,6 @@ muConversion (V n) (ExprFunction as vs r) = if n <= 0
                                                  (unMu o):[]
                                             else
                                                 os
-                                        {-let o'' = if length os == 0
-                                            then
-                                                unMu o
-                                            else
-                                                foldr ((:) . unMu) [] $ unMu o
-                                        let swap_vs = map T.swap new_vs
-                                        case lookup o'' swap_vs of
-                                            Just x ->  muConversion (V $ n-1) $ ExprFunction as (removePointerNodes $ findAndUpdate (V n) (ExpId x) vs) r
-                                            _ ->-}
                                         case o' of
                                             ((ExpVar x):[]) -> muConversion (V $ n-1) $ ExprFunction as (removePointerNodes $ findAndUpdate (V n) (ExpId (V x)) vs) r
                                             _ -> do
@@ -231,7 +221,7 @@ muConversion (V n) (ExprFunction as vs r) = if n <= 0
                                                             else
                                                                 fmap (\x-> case L.elemIndex x l of Just i -> l''' !! i) v
                                                 --let vs'' = removeParameterNodes as $ removePointerNodes $ findAndUpdate (V n) v' vs'
-                                                let vs'' = removePointerNodes $ findAndUpdate (V n) v' vs'        
+                                                let vs'' = removePointerNodes $ findAndUpdate (V n) v' vs'
                                                 muConversion (V $ n-1) $ ExprFunction as vs'' r
 
 findScalars :: [(V,Expr V)] -> [(V,Expr V)]

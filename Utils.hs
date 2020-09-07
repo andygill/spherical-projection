@@ -40,7 +40,7 @@ fromLongLatToFisheyePt f ll = (r * cos t, r * sin t)
     where
         (x,y,z) = (longLatToPoint ll) :: Point
         t = atan2 z x :: Radian
-        r = ((2 * atan2 (sqrt (x^2 + z^2)) (y)) / (f * num_piS)) :: Scalar
+        r = (2 * atan2 (sqrt (x^2 + z^2)) (y)) / (f * num_piS) :: Scalar
 
 -- f is aperature
 fromFisheyeToLongLat :: Scalar -> Fisheye -> (Longitude, Latitude)

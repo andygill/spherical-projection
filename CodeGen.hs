@@ -14,9 +14,21 @@ compareCode path f@(ExprFunction as vs r) = do
     let f2 = Haskell $ muConversion (V vStart) f
     let output_string = unlines $
                         ["import Test.QuickCheck",""] ++
-                        ["prop_f (" ++ (castDouble args) ++ ") = { let f1 = " ++ (show f1) ++ " in let f2 = " ++ (show f2) ++ " in "] ++
-                        ["f1 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")  ++ " == f2 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")] 
+                        ["prop_f (" ++ (castDouble args) ++ ") = f1 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")  ++ " == f2 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")] ++
+                        ["f1 = " ++ (show f1), "f2 = " ++ (show f2)]
+
     writeFile path output_string
+
+transliterate :: String -> Language -> [ExprFunction] -> IO ()
+transliterate path lang fs = writeFile path output_string
+    where
+        numberFunc _ [] = []
+        numberFunc i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(numberFunc (i+1) xs)
+        output_string = unlines $ numberFunc 0 $ map (\f@(ExprFunction as vs r)-> l $ muConversion (V $ (length as) + length vs) f) fs
+            where
+                l = case lang of
+                    JS -> show . JavaScript
+                    HSKL -> show . Haskell
 
 castDouble :: [String] -> String
 castDouble [] = ""
@@ -30,7 +42,7 @@ listToTuple' (x:xs) = x ++ ", " ++ (listToTuple' xs)
 
 --------------------------------------------------------------------------------------------------
 
---data Language = JavaScript | Haskell
+data Language = JS | HSKL | C
 
 listToTuple :: Show a => [a] -> String
 listToTuple [] = ""
@@ -102,10 +114,10 @@ instance Show Haskell where
       showAssign (v,ExpMul e1 e2)   = showHaskell v $ show e1 ++ " * " ++ show e2
       showAssign (v,ExpDiv e1 e2)   = showHaskell v $ show e1 ++ " / " ++ show e2
       showAssign (v,ExpPower e1 e2) = showHaskell v $ show e1 ++ " ^ " ++ show e2
-      showAssign (v,ExpAtan2 e1 e2) = showHaskell v $ show e1 ++ " " ++ show e2
+      showAssign (v,ExpAtan2 e1 e2) = showHaskell v $ "atan2 " ++ show e1 ++ " " ++ show e2
       showAssign (v,ExpRectilinear e1 e2) = showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
       showAssign (v,ExpFisheye e1 e2)= showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
-      showAssign (v,ExpIfZero i t e) =showHaskell v $ "if " ++ show i ++ " then " ++ show t ++ " else " ++ show e
+      showAssign (v,ExpIfZero i t e)= showHaskell v $ "if " ++ show i ++ " then " ++ show t ++ " else " ++ show e
       --showAssign (v,ExpVar i)
       showAssign (v,e) = "  // let " ++ show v ++ " = " ++ show e
 

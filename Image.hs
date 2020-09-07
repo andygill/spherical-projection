@@ -51,12 +51,12 @@ inverseFisheyeTransform img@Image {..} = runST $ do
 
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
-    let size = min imageHeight imageWidth
+    let size = max imageHeight imageWidth
     mimg <- M.newMutableImage size size
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (4/2.8) $ (\(x,y) -> (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
+                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (35/4) $ (\(x,y) -> (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
                     if x' >= size || x' < 0 || y' >= size || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
@@ -162,6 +162,14 @@ normalize h w (x,y) = (x', y')
         dy = div h 2
         x' = (fromIntegral x / fromIntegral dx) - 1
         y' = (-) 1 $ fromIntegral y / fromIntegral dy
+
+normalize'' :: Scalar -> Scalar -> Point2D -> Point2D
+normalize'' h w (x,y) = (x', y')
+    where
+        dx = w / 2
+        dy = h / 2
+        x' = (x / dx) - 1
+        y' = 1 - (y / dy)
 
 normalize' :: Height -> Width -> PixelCoord -> Double2D
 normalize' h w (x,y) = (x', y')
