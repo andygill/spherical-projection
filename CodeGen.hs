@@ -22,7 +22,6 @@ transliterate path lang fs = writeFile path output_string
 transliterate' :: String -> Language -> [(String, ExprFunction)] -> IO ()
 transliterate' path lang fs = writeFile path $ unlines $ map (\(n,f@(ExprFunction as vs r))-> (++) ("f" ++ n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
 
-
 showLang :: Language -> (ExprFunction -> String)
 showLang lang = case lang of
                     JS      -> show . JavaScript
