@@ -6,6 +6,29 @@ import System.IO (writeFile)
 import Expr
 import Optimizer
 
+
+--Takes a list of exprfunctions, optimizes them, and them writes them to file where f_i is the ith function of the list
+transliterate :: String -> Language -> [ExprFunction] -> IO ()
+transliterate path lang fs = writeFile path output_string
+    where
+        labelFcn _ [] = []
+        labelFcn i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(labelFcn (i+1) xs)
+        output_string = unlines $ labelFcn 1 $ map (\f@(ExprFunction as vs r)-> l $ muConversion (V $ (length as) + length vs) f) fs
+            where
+                l = case lang of
+                    JS -> show . JavaScript
+                    HSKL -> show . Haskell
+
+transliterate' :: String -> Language -> [(String, ExprFunction)] -> IO ()
+transliterate' path lang fs = writeFile path $ unlines $ map (\(n,f@(ExprFunction as vs r))-> (++) ("f" ++ n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
+
+
+showLang :: Language -> (ExprFunction -> String)
+showLang lang = case lang of
+                    JS      -> show . JavaScript
+                    HSKL    -> show . Haskell
+                    _       -> error "unknown language"
+
 compareCode :: String -> ExprFunction -> IO ()
 compareCode path f@(ExprFunction as vs r) = do
     let vStart = (length as) + (length vs)
@@ -16,19 +39,7 @@ compareCode path f@(ExprFunction as vs r) = do
                         ["import Test.QuickCheck",""] ++
                         ["prop_f (" ++ (castDouble args) ++ ") = f1 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")  ++ " == f2 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")] ++
                         ["f1 = " ++ (show f1), "f2 = " ++ (show f2)]
-
     writeFile path output_string
-
-transliterate :: String -> Language -> [ExprFunction] -> IO ()
-transliterate path lang fs = writeFile path output_string
-    where
-        numberFunc _ [] = []
-        numberFunc i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(numberFunc (i+1) xs)
-        output_string = unlines $ numberFunc 0 $ map (\f@(ExprFunction as vs r)-> l $ muConversion (V $ (length as) + length vs) f) fs
-            where
-                l = case lang of
-                    JS -> show . JavaScript
-                    HSKL -> show . Haskell
 
 castDouble :: [String] -> String
 castDouble [] = ""
