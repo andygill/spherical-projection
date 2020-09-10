@@ -51,13 +51,13 @@ inverseFisheyeTransform img@Image {..} = runST $ do
 
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
-    let size = max imageHeight imageWidth
+    let size = min imageHeight imageWidth
     mimg <- M.newMutableImage size size
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (35/4) $ (\(x,y) -> (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
-                    if x' >= size || x' < 0 || y' >= size || y' < 0 then
+                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (13/8) $ (\(x,y) -> (scalarToLong $ x * (-num_piS), scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
+                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
                         writePixel mimg x y $ pixelAt img x' y'
@@ -120,6 +120,9 @@ type Double2D = (Double,Double)
 type PixelCoord = (Int, Int)
 type Height = Int
 type Width = Int
+type HeightS = Scalar
+type WidthS = Scalar
+type PixelCoordS = (Scalar, Scalar)
 {-}
 inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
 inverseFisheyeTransform img@Image {..} = runST $ do
@@ -163,7 +166,7 @@ normalize h w (x,y) = (x', y')
         x' = (fromIntegral x / fromIntegral dx) - 1
         y' = (-) 1 $ fromIntegral y / fromIntegral dy
 
-normalize'' :: Scalar -> Scalar -> Point2D -> Point2D
+normalize'' :: HeightS -> WidthS -> Point2D -> Point2D
 normalize'' h w (x,y) = (x', y')
     where
         dx = w / 2
@@ -186,6 +189,9 @@ unnormalize h w (x', y') = (x,y)
         dy = fromIntegral $ div h 2
         x  = round $ dx * (1 + x')
         y  = round $ dy * (1 - y')
+
+unnormalize'' :: HeightS -> WidthS -> PixelCoordS -> Point2D
+unnormalize'' h w (x', y') = ((w / 2) * (1 + x'), (h / 2) * (1 - y'))
 
 point2DtoRectilinear :: Point2D -> Rectilinear
 point2DtoRectilinear (x,y) = Rectilinear x y
@@ -236,22 +242,7 @@ normFisheyeToLongLat ap (x,y) = (long, lat)
         a   = toRadian $ r * ap / 2
         long= T.acos $ r / (y * (T.sin(a) / T.cos(a)))
         lat = T.asin $ y * T.sin(a) / r
-
-WHAT MY GOAL IS: This breaks up teh quadrants correctly
-if (x > 0 && y > 0) || (x <= 0 && y > 0) -> acos x
-if x > 0 && y <= 0 -> asin y
-if x < 0 && y < 0 -> 2*pi - acos x
-
-
-equiRecToFisheye :: Point2D -> Fisheye
-equiRecToFisheye (x,y) = Fisheye r t
-    where
-        r = sqrt $ x*x + y*y
-        t = case nearZero r of
-            False -> acos $ x / r :: Radian
-            True -> case x > 0 of
-                True -> num_pi :: Radian
-                False -> 0 :: Radian-}
+-}
 
 longLatDoubleToPixelCoord :: Int -> Int -> Double2D -> PixelCoord
 longLatDoubleToPixelCoord h w (x,y) = unnormalize h w (x/pi, y*2/pi)--filterBadBoys (x/pi, y*2/pi)
