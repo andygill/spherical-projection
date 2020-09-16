@@ -52,11 +52,12 @@ inverseFisheyeTransform img@Image {..} = runST $ do
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
-    mimg <- M.newMutableImage size size
-    let go x y  | x >= size = go 0 $ y + 1
+    mimg <- M.newMutableImage (2*size) size
+    let go x y  | x >= (2*size) = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ fromLongLatToFisheyePt (4/2.8) $ (\(x,y) -> (scalarToLong $ x * (-num_piS / 2), scalarToLat $ y * num_piS / 2)) $ normalize size size (x,y)
+                    --potential example: https://github.com/raboof/dualfisheye2equirectangular/blob/master/projection.c
+                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ rotate (num_piS / 4) $ targetPtToFishImage (35/4) $ normalize size (2*size) (x,y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
@@ -219,6 +220,15 @@ normFisheyeToLongLat ap (x,y) = pointToLongLat (p_x, p_y, p_z)
         p_x = (T.sin a) * x / r
         p_y = T.cos a
         p_z = (T.sin a) * y / r
+
+targetPtToFishImage :: Scalar -> (Scalar, Scalar) -> PixelCoordS
+targetPtToFishImage f (x, y) = (x', y')
+    where
+        (p_x, p_y, p_z) = longLatToPoint (scalarToLong $ x * num_piS, scalarToLat $ y * num_piS / 2)
+        a = T.acos p_y
+        r = (toScalar a) * 2 / f
+        x' = p_z * r / (T.sin a)
+        y' = p_x * r / (T.sin a)
 
 --Projection plane at (-1), essentially an equivalent val
 projStereoNeg1ToLongLat :: (Longitude, Latitude) -> (Longitude, Latitude)
