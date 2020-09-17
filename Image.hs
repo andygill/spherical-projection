@@ -124,40 +124,6 @@ type Width = Int
 type HeightS = Scalar
 type WidthS = Scalar
 type PixelCoordS = (Scalar, Scalar)
-{-}
-inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
-inverseFisheyeTransform img@Image {..} = runST $ do
-    let size = min imageHeight imageWidth
-    mimg <- M.newMutableImage size size
-    let dx = (fromIntegral imageWidth) / 2
-    let dy = (fromIntegral imageHeight) / 2
-    let radius = (fromIntegral size) / 2
-    f :: Point2D -> Mu Expr
-    let f = fix opt $ toMuExpr $ longLatTo2D dy dx $ normFisheyeToLongLat (35/4) $ normalize radius radius
-    let go x y  | x >= size = go 0 $ y + 1
-                | y >= size = M.freezeImage mimg
-                | otherwise = do
-                    let (x1,y1) = normalize' size size (x,y)
-                    if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = (\(a,b) -> (floor a, floor b)) $ extractTuple $ evalMu $ f (fromIntegral x, fromIntegral y)
-                        if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
-                            writePixel mimg x y $ PixelRGB8 0 0 0
-                        else
-                            writePixel mimg x y $ pixelAt img x' y'
-                    else
-                        writePixel mimg x y $ PixelRGB8 0 0 0
-                    go (x + 1) y
-    go 0 0
-
-normalize :: Scalar -> Scalar -> Point2D -> Point2D
-normalize dx dy = translate (-1) 1 . scale (1 / dx) ((-1) / dy)
-
-unnormalize :: Scalar -> Scalar -> Point2D -> Point2D
-unnormalize dx dy = scale dx (-dy) . translate 1 (-1)
-
-longLatTo2D :: Scalar -> Scalar -> (Longitude, Latitude) -> Point2D
-longLatTo2D h w (ll, la) = unnormalize h w $ scale (1/num_pi) (2/num_pi) (longToScalar ll, latToScalar la) --filterBadBoys (x/pi, y*2/pi)
--}
 
 normalize :: Height -> Width -> PixelCoord -> Point2D
 normalize h w (x,y) = (x', y')
@@ -191,8 +157,8 @@ unnormalize h w (x', y') = (x,y)
         x  = round $ dx * (1 + x')
         y  = round $ dy * (1 - y')
 
-unnormalize'' :: HeightS -> WidthS -> PixelCoordS -> Point2D
-unnormalize'' h w (x', y') = ((w / 2) * (1 + x'), (h / 2) * (1 - y'))
+unnormalize' :: HeightS -> WidthS -> PixelCoordS -> Point2D
+unnormalize' h w (x', y') = ((w / 2) * (1 + x'), (h / 2) * (1 - y'))
 
 point2DtoRectilinear :: Point2D -> Rectilinear
 point2DtoRectilinear (x,y) = Rectilinear x y
@@ -235,24 +201,6 @@ projStereoNeg1ToLongLat :: (Longitude, Latitude) -> (Longitude, Latitude)
 projStereoNeg1ToLongLat (long, lat) = ((scalarToLong c) * long, (scalarToLat c) * lat)
     where
         c = (1 - T.sin lat) / 2
-{-}
-normFisheyeToPoint' :: Double -> Double2D -> (Double, Double, Double)
-normFisheyeToPoint' ap (x,y) = (p_x, p_y, p_z)
-    where
-        r   = sqrt $ x*x + y*y
-        a   = r * ap / 2
-        p_x = (P.sin a) * x / r
-        p_y = P.cos a
-        p_z = (P.sin a) * y / r
-
-normFisheyeToLongLat :: Scalar -> Point2D -> (Longitude, Latitude)
-normFisheyeToLongLat ap (x,y) = (long, lat)
-    where
-        r   = sqrt $ x*x + y*y
-        a   = toRadian $ r * ap / 2
-        long= T.acos $ r / (y * (T.sin(a) / T.cos(a)))
-        lat = T.asin $ y * T.sin(a) / r
--}
 
 longLatDoubleToPixelCoord :: Int -> Int -> Double2D -> PixelCoord
 longLatDoubleToPixelCoord h w (x,y) = unnormalize h w (x/pi, y*2/pi)--filterBadBoys (x/pi, y*2/pi)

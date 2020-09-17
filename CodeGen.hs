@@ -5,7 +5,18 @@ import System.IO (writeFile)
 
 import Expr
 import Optimizer
+import Image
+import Utils
 
+outputCode :: (Var a, ToExpr b) => String -> Language -> [(a -> b)] -> IO ()
+outputCode path lang fs = do
+    es <- sequence $ map (\f -> do x <- reifyFunction f; return $ muConversion (maxNode x) x) fs
+    transliterate path lang es
+
+outputCode' :: (Var a, ToExpr b) => String -> Language -> [(String,(a -> b))] -> IO ()
+outputCode' path lang fs = do
+    es <- sequence $ map (\(n,f) -> do x <- reifyFunction f; return (n, muConversion (maxNode x) x)) fs
+    transliterate' path lang es
 
 --Takes a list of exprfunctions, optimizes them, and them writes them to file where f_i is the ith function of the list
 transliterate :: String -> Language -> [ExprFunction] -> IO ()
@@ -13,14 +24,10 @@ transliterate path lang fs = writeFile path output_string
     where
         labelFcn _ [] = []
         labelFcn i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(labelFcn (i+1) xs)
-        output_string = unlines $ labelFcn 1 $ map (\f@(ExprFunction as vs r)-> l $ muConversion (V $ (length as) + length vs) f) fs
-            where
-                l = case lang of
-                    JS -> show . JavaScript
-                    HSKL -> show . Haskell
+        output_string = unlines $ labelFcn 1 $ map (\f@(ExprFunction as vs r)-> (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
 
 transliterate' :: String -> Language -> [(String, ExprFunction)] -> IO ()
-transliterate' path lang fs = writeFile path $ unlines $ map (\(n,f@(ExprFunction as vs r))-> (++) ("f" ++ n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
+transliterate' path lang fs = writeFile path $ unlines $ map (\(n,f@(ExprFunction as vs r))-> (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
 
 showLang :: Language -> (ExprFunction -> String)
 showLang lang = case lang of
@@ -30,10 +37,10 @@ showLang lang = case lang of
 
 compareCode :: String -> ExprFunction -> IO ()
 compareCode path f@(ExprFunction as vs r) = do
-    let vStart = (length as) + (length vs)
+    let vStart = maxNode f
     let args = ["a" ++ (show i) | i <- [1..(length as)]]
     let f1 = Haskell f
-    let f2 = Haskell $ muConversion (V vStart) f
+    let f2 = Haskell $ muConversion vStart f
     let output_string = unlines $
                         ["import Test.QuickCheck",""] ++
                         ["prop_f (" ++ (castDouble args) ++ ") = f1 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")  ++ " == f2 " ++ (if null args then "" else "(" ++ (listToTuple' args) ++ ")")] ++
