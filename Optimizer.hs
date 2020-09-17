@@ -88,6 +88,9 @@ opt (Mu a) = Mu $ fmap opt a
 
 -------------------------------------------------------------------------------------------
 
+maxNode :: ExprFunction -> V
+maxNode (ExprFunction as vs _) = V $ (length as) + (length vs)
+
 findAndUpdate :: Eq a => a -> b -> [(a,b)] -> [(a,b)]
 findAndUpdate s u [] = []
 findAndUpdate s u ((a,b):xs)    | a == s = (a,u):xs
