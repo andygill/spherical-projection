@@ -12,7 +12,8 @@ import Control.Monad
 import Expr
 import Types as T
 import Utils
-import Optimizer
+--import GenFunctions
+import Funcs
 
 dynWidth :: DynamicImage -> Int
 dynWidth img = dynamicMap imageWidth img
@@ -39,7 +40,7 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                 | otherwise = do
                     let (x1,y1) = normalize' size size (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = longLatDoubleToPixelCoord imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $  normFisheyeToLongLat (35/4) $ normalize size size (x,y)
+                        let (x',y') = (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
                         if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                             writePixel mimg x y $ PixelRGB8 0 0 0
                         else
@@ -52,12 +53,13 @@ inverseFisheyeTransform img@Image {..} = runST $ do
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
-    mimg <- M.newMutableImage (2*size) size
-    let go x y  | x >= (2*size) = go 0 $ y + 1
+    mimg <- M.newMutableImage size size
+    let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
                     --potential example: https://github.com/raboof/dualfisheye2equirectangular/blob/master/projection.c
-                    let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ rotate (num_piS / 4) $ targetPtToFishImage (35/4) $ normalize size (2*size) (x,y)
+                    --let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ targetPtToFishImage (35/4) $ normalize size size (x,y)
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else

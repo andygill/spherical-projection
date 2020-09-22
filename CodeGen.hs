@@ -7,16 +7,34 @@ import Expr
 import Optimizer
 import Image
 import Utils
+import Types
+
 
 outputCode :: (Var a, ToExpr b) => String -> Language -> [(a -> b)] -> IO ()
 outputCode path lang fs = do
     es <- sequence $ map (\f -> do x <- reifyFunction f; return $ muConversion (maxNode x) x) fs
     transliterate path lang es
 
-outputCode' :: (Var a, ToExpr b) => String -> Language -> [(String,(a -> b))] -> IO ()
-outputCode' path lang fs = do
+{-
+
+newtype Fun where
+ Fun :: Var a, ToExpr b => (a -> b) -> Fun 
+ Fun :: (…) :: [String] -> (a -> b) -> ...
+ Fun :: (…) => [String] -> (a -> b) -> Fun 
+\ a -> sin a
+ \ a -> call a “a” $ sin a 
+name :: (Var a, ToExpr b) => a -> String -> b -> b
+ \ a -> name a “a” $ sin a
+ \ (B a) -> sin a
+ newtype B where B :: Var a -> a -> B
+
+TODO∷ Figure out how to name variables before output.
+-}
+outputCode' :: (Var a, ToExpr b) => String -> String -> Language -> [(String,(a -> b))] -> IO ()--[((String,[String]),(a -> b))] -> IO ()
+outputCode' path modname lang fs = do
     es <- sequence $ map (\(n,f) -> do x <- reifyFunction f; return (n, muConversion (maxNode x) x)) fs
-    transliterate' path lang es
+    transliterate' path modname lang es
+
 
 --Takes a list of exprfunctions, optimizes them, and them writes them to file where f_i is the ith function of the list
 transliterate :: String -> Language -> [ExprFunction] -> IO ()
@@ -26,8 +44,11 @@ transliterate path lang fs = writeFile path output_string
         labelFcn i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(labelFcn (i+1) xs)
         output_string = unlines $ labelFcn 1 $ map (\f@(ExprFunction as vs r)-> (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
 
-transliterate' :: String -> Language -> [(String, ExprFunction)] -> IO ()
-transliterate' path lang fs = writeFile path $ unlines $ map (\(n,f@(ExprFunction as vs r))-> (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
+transliterate' :: String -> String -> Language -> [(String, ExprFunction)] -> IO ()
+transliterate' path modname lang fs = writeFile path $ unlines $ (++) modstring $ map fn fs
+    where
+        modstring = ["module " ++ modname ++ " where"]
+        fn = (\(n,f@(ExprFunction as vs r))-> (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f)
 
 showLang :: Language -> (ExprFunction -> String)
 showLang lang = case lang of
@@ -132,10 +153,18 @@ instance Show Haskell where
       showAssign (v,ExpDiv e1 e2)   = showHaskell v $ show e1 ++ " / " ++ show e2
       showAssign (v,ExpPower e1 e2) = showHaskell v $ show e1 ++ " ^ " ++ show e2
       showAssign (v,ExpAtan2 e1 e2) = showHaskell v $ "atan2 " ++ show e1 ++ " " ++ show e2
-      showAssign (v,ExpRectilinear e1 e2) = showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
-      showAssign (v,ExpFisheye e1 e2)= showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
-      showAssign (v,ExpIfZero i t e)= showHaskell v $ "if " ++ show i ++ " then " ++ show t ++ " else " ++ show e
-      --showAssign (v,ExpVar i)
+      showAssign (v,ExpRectilinear e1 e2)   = showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
+      showAssign (v,ExpFisheye e1 e2)       = showHaskell v $ "(" ++ show e1 ++ ", " ++ show e2 ++ ")"
+      showAssign (v,ExpIfZero i t e)        = showHaskell v $ "if " ++ show i ++ " then " ++ show t ++ " else " ++ show e
       showAssign (v,e) = "  // let " ++ show v ++ " = " ++ show e
 
 showHaskell v se = "    let " ++ show v ++ " = " ++ se ++ " in"
+
+-----------------------------------------------------------------------------------------------
+
+
+regenFunctions :: IO ()
+regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye,inverseFisheye]
+    where
+        unFisheye = ("unFisheyeTransform", (\ h w s f x y -> unnormalize' h w $ rotate (num_piS / 2) $ targetPtToFishImage f $ normalize'' s s (x,y)))
+        inverseFisheye = ("inverseFisheye", (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
