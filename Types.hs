@@ -11,7 +11,7 @@ import Data.Reify
 import Debug.Trace
 import Control.Applicative (liftA2)
 
-import Prelude hiding (sin, cos, atan2, asin, acos, (^))
+import Prelude hiding (sin, cos, atan2, asin, acos, (^), tan)
 import qualified Prelude as P
 
 import Expr
@@ -47,6 +47,7 @@ instance Floating Scalar where
 instance Math Scalar where
     sin (Scalar r) = Scalar $ Mu $ ExpSin r
     cos (Scalar r) = Scalar $ Mu $ ExpCos r
+    tan (Scalar r) = Scalar $ Mu $ ExpTan r
     atan2 (Scalar a) (Scalar b) = Scalar $ Mu $ ExpAtan2 a b
 
 instance Conditional Scalar where
@@ -96,6 +97,7 @@ instance Fractional Radian where
 class Math radian where
   sin   :: radian -> Scalar
   cos   :: radian -> Scalar
+  tan   :: radian -> Scalar
   asin  :: Scalar -> radian
   acos  :: Scalar -> radian
   atan  :: Scalar -> radian
@@ -104,6 +106,7 @@ class Math radian where
 instance Math Radian where
   sin (Radian r) = Scalar $ Mu $ ExpSin r
   cos (Radian r) = Scalar $ Mu $ ExpCos r
+  tan (Radian r) = Scalar $ Mu $ ExpTan r
   asin (Scalar s) = Radian $ Mu $ ExpAsin s
   acos (Scalar s) = Radian $ Mu $ ExpAcos s
   atan (Scalar s) = Radian $ Mu $ ExpAtan s
@@ -169,6 +172,7 @@ instance Conditional Latitude where
 instance Math Longitude where
   sin (Longitude a) = sin a
   cos (Longitude a) = cos a
+  tan (Longitude a) = tan a
   asin = Longitude . asin
   acos = Longitude . acos
   atan2 y x = Longitude $ atan2 y x
@@ -176,6 +180,7 @@ instance Math Longitude where
 instance Math Latitude where
   sin (Latitude a) = sin a
   cos (Latitude a) = cos a
+  tan (Latitude a) = tan a
   asin = Latitude . asin
   acos = Latitude . acos
   atan2 y x = Latitude $ atan2 y x

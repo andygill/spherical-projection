@@ -1,13 +1,6 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module Main where
 
-import Data.Dynamic
-import Data.Reify
 import System.Environment
 import Codec.Picture
 
@@ -15,7 +8,6 @@ import Prelude hiding (asin, acos, atan, tan, sin, cos, atan2, (^))
 import qualified Prelude as P
 
 import Image
-import qualified Data.Graph as G
 
 main = do
     [transform, ext, pathFrom, pathTo] <- getArgs
@@ -43,7 +35,7 @@ main = do
                     "tga"   -> writeTga pathTo
                     _       -> error "Invalid extension"
                 f = case transform of
-                    "1" -> inverseFisheyeTransform
+                    "1" -> inverseFisheyeTransform . squareImage
                     "2" -> unFisheye
                     "3" -> inversePanoToLittlePlanet
                     "4" -> panoToLittlePlanet
