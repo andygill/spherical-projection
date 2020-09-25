@@ -40,7 +40,7 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                 | otherwise = do
                     let (x1,y1) = normalize' size size (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
+                        let (x',y') = (x,y) -- (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
                         if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                             writePixel mimg x y $ PixelRGB8 0 0 0
                         else
@@ -54,12 +54,13 @@ unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
     mimg <- M.newMutableImage size size
-    let go x y  | x >= size = go 0 $ y + 1
-                | y >= size = M.freezeImage mimg
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
                     --potential example: https://github.com/raboof/dualfisheye2equirectangular/blob/master/projection.c
+                    --http://paulbourke.net/dome/fish2/fish2sphere.pdf
                     --let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ targetPtToFishImage (35/4) $ normalize size size (x,y)
-                    let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, (35/4), fromIntegral x, fromIntegral y)
                     if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
@@ -198,6 +199,14 @@ targetPtToFishImage f (x, y) = (x', y')
         x' = p_z * r / (T.sin a)
         y' = p_x * r / (T.sin a)
 
+--http://paulbourke.net/dome/fish2/fish2sphere.pdf
+-- f is field of view in radian
+unfish' :: Scalar -> (Scalar, Scalar) -> PixelCoordS
+unfish' f (x,y) = (x, x*t)
+    where
+        (long, lat) = (toRadian $ x * num_piS, y*num_piS/2)
+        t = T.tan long
+        x = (2*lat) / (f*(1+t))
 --Projection plane at (-1), essentially an equivalent val
 projStereoNeg1ToLongLat :: (Longitude, Latitude) -> (Longitude, Latitude)
 projStereoNeg1ToLongLat (long, lat) = ((scalarToLong c) * long, (scalarToLat c) * lat)

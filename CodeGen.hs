@@ -164,7 +164,7 @@ showHaskell v se = "    let " ++ show v ++ " = " ++ se ++ " in"
 
 
 regenFunctions :: IO ()
-regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye,inverseFisheye]
+regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
     where
-        unFisheye = ("unFisheyeTransform", (\ h w s f x y -> unnormalize' h w $ rotate (num_piS / 2) $ targetPtToFishImage f $ normalize'' s s (x,y)))
+        unFisheye = ("unFisheyeTransform", (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
         inverseFisheye = ("inverseFisheye", (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
