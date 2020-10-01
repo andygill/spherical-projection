@@ -2,6 +2,7 @@
 module CodeGen where
 
 import System.IO (writeFile)
+import Data.Char (isAlphaNum)
 
 import Expr
 import Optimizer
@@ -35,6 +36,10 @@ outputCode' path modname lang fs = do
     es <- sequence $ map (\(n,f) -> do x <- reifyFunction f; return (n, muConversion (maxNode x) x)) fs
     transliterate' path modname lang es
 
+outputCode'' :: (Var a, ToExpr b) => String -> String -> Language -> [(String, [String], (a -> b))] -> IO ()--[((String,[String]),(a -> b))] -> IO ()
+outputCode'' path modname lang fs = do
+    es <- sequence $ map (\(n, as, f) -> do x <- reifyFunction f; return (n, as, muConversion (maxNode x) x)) fs
+    transliterate'' path modname lang es
 
 --Takes a list of exprfunctions, optimizes them, and them writes them to file where f_i is the ith function of the list
 transliterate :: String -> Language -> [ExprFunction] -> IO ()
@@ -50,11 +55,39 @@ transliterate' path modname lang fs = writeFile path $ unlines $ (++) modstring 
         modstring = ["module " ++ modname ++ " where"]
         fn = (\(n,f@(ExprFunction as vs r))-> (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f)
 
+transliterate'' :: String -> String -> Language -> [(String, [String], ExprFunction)] -> IO ()
+transliterate'' path modname lang fs = writeFile path $ unlines $ (++) modstring $ map fn fs
+    where
+        modstring = ["module " ++ modname ++ " where"]
+        fn = (\(n, names, f@(ExprFunction as vs r))-> checkString names (map show as) $ (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f)
+
+
 showLang :: Language -> (ExprFunction -> String)
 showLang lang = case lang of
                     JS      -> show . JavaScript
                     HSKL    -> show . Haskell
                     _       -> error "unknown language"
+
+findAndReplace :: (String, Int, String) -> Int -> String -> String
+findAndReplace a@(k,lk,r) sl (s:ss) | lk > sl = (s:ss)
+                                    | not $ isAlphaNum s = [s] ++ (findAndReplace a (sl - 1) ss)
+                                    | k == take lk (s:ss) = if lk /= sl
+                                        then
+                                            if not $ isAlphaNum $ (s:ss) !! lk then
+                                                r ++ (findAndReplace a (sl - lk) $ drop lk (s:ss))
+                                            else --the next character after is not also a part of the variable name
+                                                [s] ++ (findAndReplace a (sl - 1) ss)
+                                        else --reach end of string and made a match
+                                            r
+                                    | otherwise = [s] ++ (findAndReplace a (sl - 1) ss)
+
+checkString :: [String] -> [String] -> String -> String
+checkString [] _ s = s
+checkString _ [] s = s
+checkString (n:ns) (a:as) s | n == "" = checkString ns as s
+                            | otherwise = checkString ns as $ findAndReplace (a, length a, n) (length s) s
+--    where
+--        new_s = unwords . (map (\x -> findAndReplace (a, length a, n) (length x) x)) . words
 
 compareCode :: String -> ExprFunction -> IO ()
 compareCode path f@(ExprFunction as vs r) = do
@@ -168,3 +201,9 @@ regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFishey
     where
         unFisheye = ("unFisheyeTransform", (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
         inverseFisheye = ("inverseFisheye", (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
+
+regenFunctions' :: IO ()
+regenFunctions' = outputCode'' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
+    where
+        unFisheye = ("unFisheyeTransform", ["height", "width", "aperture", "x", "y"], (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
+        inverseFisheye = ("inverseFisheye", ["height", "width", "side", "aperture", "x", "y"], (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
