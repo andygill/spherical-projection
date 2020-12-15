@@ -98,8 +98,35 @@ There are two functions that transfer between the two spaces.
 
 `type Point2D = (Scalar, Scalar)`
 
-There are also some utility functions to help facilitate moving from radian to scalar, and from lat/long to scalar, and vice versa.
+There are also some utility functions to help facilitate moving from radian to scalar, and from lat/long to scalar, and vice versa. (Kinda subvert the type system but are really helpful when an operations acts on 2 different spaces)
+
+### Optimizer.hs
+This file uses simple algebraic and trig identities to remove unnecessary Expr's in an ExprFunction. Additionally acts as a partial evaluator for nodes where operations are defined (ie not adding a scalar and an Expr node). There are many comments throughout the file so this part will be brief.
+
+#### opt
+`opt :: Mu Expr -> Mu Expr`
+
+opt is a function that simplifies algebra and trigonometry when it has the ability to do so, outputting a new form of the operations tree/operation.
+
+#### muConversion
+`muConversion :: V -> ExprFunction -> ExprFunction`
+
+muConversion takes an entry node and an ExprFunction and runs optimizations as well as partial evaluation wherever possible, returning a new ExprFunction. It is a deceivingly complicated function used to hack ways to optimize & evaluate an expression tree. Brief description of events:
+
+1. Checks if the input index if <= 0. if so clean up the function and stop, otherwise continue
+2. Lookup entry node and see if it is a id, var, or scalar
+ - If so, continue to the next iteration
+ - Otherwise, continue
+3. Try to see if the given node is on the leaves of the expr tree by making the expr a Mu Expr and then running eval on it
+ - If a real number/tuple returns Just, replace the given entry node's expr with the scalar evaluated expression. Move on to the next iteration
+ - Otherwise, continue
+4. Test to see if the Mu Expr of the given node changes after optimization.
+ - If so, go to next iteration
+ - Otherwise, continue
+5. Other stuff idk how to explain just yet
 
 ## Files - File and Image Generation
+
+
 
 ## Files - Mathematics/Utility

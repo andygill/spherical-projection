@@ -10,7 +10,7 @@ import Image
 import Utils
 import Types
 
-
+-- 
 outputCode :: (Var a, ToExpr b) => String -> Language -> [(a -> b)] -> IO ()
 outputCode path lang fs = do
     es <- sequence $ map (\f -> do x <- reifyFunction f; return $ muConversion (maxNode x) x) fs
