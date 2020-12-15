@@ -40,7 +40,7 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                 | otherwise = do
                     let (x1,y1) = normalize' size size (x,y)
                     if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = (x,y) -- (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
+                        let (x',y') = (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
                         if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
                             writePixel mimg x y $ PixelRGB8 0 0 0
                         else

@@ -148,6 +148,7 @@ instance Num Longitude where
   fromInteger = Longitude . fromInteger
 
 instance Fractional Longitude where
+  Longitude a / Longitude b = Longitude (a / b)
   fromRational = Longitude . fromRational
 
 instance Conditional Longitude where
@@ -164,6 +165,7 @@ instance Num Latitude where
     fromInteger = Latitude . fromInteger
 
 instance Fractional Latitude where
+  Latitude a / Latitude b = Latitude (a / b)
   fromRational = Latitude . fromRational
 
 instance Conditional Latitude where
@@ -259,8 +261,8 @@ scalarToLong = Longitude . toRadian
 toScalar :: Radian -> Scalar
 toScalar (Radian x) = Scalar x
 
-latToScalar (Latitude x) = toScalar x
-longToScalar (Longitude x) = toScalar x
+latToScalar (Latitude (Radian x)) = x
+longToScalar (Longitude (Radian x)) = x
 
 num_piS :: Scalar
 num_piS = Scalar $ Mu $ ExpScalar $ num_pi
