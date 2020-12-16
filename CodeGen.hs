@@ -219,5 +219,7 @@ regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFishey
 regenFunctions' :: IO ()
 regenFunctions' = outputCode'' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
     where
-        unFisheye = ("unFisheyeTransform", ["height", "width", "aperture", "x", "y"], (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
+--        unFisheye = ("unFisheyeTransform", ["height", "width", "aperture", "x", "y"], (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
+
+        unFisheye = ("unFisheyeTransform", ["height", "width", "x", "y"], (\ h w x y _ _-> spec_unnorm h w $ (\(px,py,pz) -> (Types.atan2 ((-1) * pz) px, (Types.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y))
         inverseFisheye = ("inverseFisheye", ["height", "width", "side", "aperture", "x", "y"], (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))

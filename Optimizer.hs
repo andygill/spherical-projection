@@ -21,12 +21,7 @@ opt (Mu (ExpAdd (Mu (ExpMul a b)) c))   | c == b = Mu $ ExpMul a $ Mu $ ExpAdd b
                                         | c == a = Mu $ ExpMul (Mu $ ExpAdd a $ Mu $ ExpScalar 1) b
                                         | otherwise = Mu $ ExpAdd (Mu $ ExpMul a b) c
                                         -}
--- Decreases NODES OF THE OPERATIONS GRAPH by 1
-opt (Mu (ExpAdd (Mu (ExpMul a b)) (Mu (ExpMul c d))))   | a == c = Mu $ ExpMul a $ (Mu $ ExpAdd b d)
-                                                        | a == d = Mu $ ExpMul a $ (Mu $ ExpAdd b c)
-                                                        | b == c = Mu $ ExpMul b $ (Mu $ ExpAdd a d)
-                                                        | b == d = Mu $ ExpMul b $ (Mu $ ExpAdd a c)
-                                                        | otherwise = Mu $ ExpAdd (Mu $ ExpMul a b) (Mu $ ExpMul c d)
+
 
 opt (Mu (ExpSub (Mu (ExpScalar 0)) a)) = Mu $ ExpMul (Mu $ ExpScalar (-1.0)) a
 opt (Mu (ExpSub a (Mu (ExpScalar 0)))) =  a
@@ -40,7 +35,6 @@ opt (Mu (ExpAsin(Mu (ExpSin     a)))) = a
 opt (Mu (ExpAsin(Mu (ExpScalar  1)))) = Mu $ ExpScalar $ num_pi / 2
 opt (Mu (ExpAsin(Mu (ExpScalar  (-1))))) = Mu $ ExpScalar $ (-num_pi) / 2
 opt (Mu (ExpAsin(Mu (ExpScalar  0)))) = Mu $ ExpScalar 0
-
 
 opt (Mu (ExpCos (Mu (ExpScalar  0)))) = Mu $ ExpScalar 1.0
 opt (Mu (ExpCos (Mu (ExpAcos    a)))) = a
@@ -56,34 +50,60 @@ opt (Mu (ExpMul (Mu (ExpScalar 1)) a)) = a
 opt (Mu (ExpMul a (Mu (ExpScalar 1)))) = a
 --opt (Mu (ExpMul a b))   | a == b = Mu $ ExpPower a 2
 --                        | otherwise = Mu $ ExpMul a (b)
-opt (Mu (ExpMul a (Mu (ExpPower b x)))) | a == b = Mu $ ExpPower b $ x + 1
+{-
+opt (Mu (ExpMul a (Mu (ExpPower b x)))) | x < -1 = opt $ Mu (ExpDiv a (Mu (ExpPower b $ negate x)))
+                                        | a == b = opt $ Mu $ ExpPower b $ x + 1
                                         | otherwise = Mu $ ExpMul a (Mu (ExpPower b x))
-opt (Mu (ExpMul (Mu (ExpPower a x)) b)) | a == b = Mu $ ExpPower a $ x + 1
+opt (Mu (ExpMul (Mu (ExpPower a x)) b)) | x < -1 = opt $ Mu (ExpDiv b (Mu (ExpPower a $ negate x)))
+                                        | a == b = opt $ Mu $ ExpPower a $ x + 1
                                         | otherwise = Mu $ ExpMul (Mu $ ExpPower a x) b
+-}
+-- Decreases NODES OF THE OPERATIONS GRAPH by 1
+opt (Mu (ExpAdd (Mu (ExpMul a b)) (Mu (ExpMul c d))))   | a == c = opt $ Mu $ ExpMul a $ (Mu $ ExpAdd b d)
+                                                        | a == d = opt $ Mu $ ExpMul a $ (Mu $ ExpAdd b c)
+                                                        | b == c = opt $ Mu $ ExpMul b $ (Mu $ ExpAdd a d)
+                                                        | b == d = opt $ Mu $ ExpMul b $ (Mu $ ExpAdd a c)
+                                                        | otherwise = Mu $ ExpAdd (Mu $ ExpMul a b) (Mu $ ExpMul c d)
+
+opt (Mu (ExpSub (Mu (ExpMul a b)) (Mu (ExpMul c d))))   | a == c = opt $ Mu $ ExpMul a $ (Mu $ ExpSub b d)
+                                                        | a == d = opt $ Mu $ ExpMul a $ (Mu $ ExpSub b c)
+                                                        | b == c = opt $ Mu $ ExpMul b $ (Mu $ ExpSub a d)
+                                                        | b == d = opt $ Mu $ ExpMul b $ (Mu $ ExpSub a c)
+                                                        | otherwise = Mu $ ExpSub (Mu $ ExpMul a b) (Mu $ ExpMul c d)
 
 -- Will not work if something "above" in the tree is 0 || Fails to error
 opt (Mu (ExpDiv (Mu (ExpScalar 0)) (Mu (ExpScalar 0)))) = error "Zero over Zero"
+opt (Mu (ExpDiv _ (Mu (ExpScalar 0)))) = error "Divide by Zero"
 opt (Mu (ExpDiv (Mu (ExpScalar 0)) _)) = Mu $ ExpScalar 0
 opt (Mu (ExpDiv a b))   | a == b = Mu $ ExpScalar 1.0
                         | otherwise = Mu $ ExpDiv a b
+
+opt (Mu (ExpDiv a (Mu (ExpMul (Mu (ExpScalar 0)) _)))) = error "Divide by Zero"
+opt (Mu (ExpDiv a (Mu (ExpMul _ (Mu (ExpScalar 0)))))) = error "Divide by Zero"
 opt (Mu (ExpDiv (Mu (ExpMul a b)) c))   | a == c = b
                                         | b == c = a
                                         | otherwise = Mu $ ExpDiv (Mu $ ExpMul a b) c
-opt (Mu (ExpDiv a (Mu (ExpMul b c))))   | b == a = c
-                                        | c == a = b
-                                        | otherwise = Mu $ ExpDiv a $ Mu $ ExpMul b c
-opt (Mu (ExpDiv (Mu (ExpPower a x)) b)) | a == b = Mu $ ExpPower a $ x - 1
-                                        | otherwise = Mu $ ExpDiv (Mu $ ExpPower a x) b
-opt (Mu (ExpDiv _ (Mu (ExpScalar 0)))) = error "Divide by Zero"
 
-{-
-opt (Mu (ExpSqrt (Mu (ExpPower a x))))  | even x = Mu $ ExpPower a $ div x 2
+opt (Mu (ExpDiv a (Mu (ExpMul b c))))   | b == a = opt $Mu $ ExpDiv (Mu $ ExpScalar 1) c
+                                        | c == a = opt $ Mu $ ExpDiv (Mu $ ExpScalar 1) b
+                                        | otherwise = Mu $ ExpDiv a $ Mu $ ExpMul b c
+{-}
+opt (Mu (ExpDiv (Mu (ExpPower a x)) b)) | x < -1 = opt $ Mu (ExpDiv (Mu $ ExpScalar 1) $ Mu $ ExpMul (Mu (ExpPower a $ negate x)) b)
+                                        | a == b = opt $ Mu $ ExpPower a $ x - 1
+                                        | otherwise = Mu $ ExpDiv (Mu $ ExpPower a x) b
+opt (Mu (ExpDiv a (Mu (ExpPower b x)))) | x < -1 = opt $ Mu (ExpMul a (Mu (ExpPower b $ negate x)))
+                                        | a == b = opt $ Mu $ ExpDiv (Mu $ ExpScalar 1) (Mu $ ExpPower b $ x - 1)
+                                        | otherwise = Mu $ ExpDiv a (Mu $ ExpPower b x)
+-}
+{-opt (Mu (ExpSqrt (Mu (ExpPower a x))))  | even x = Mu $ ExpPower a $ div x 2
                                         | otherwise = error "don't know what to do about non-integer exponents"
 
 opt (Mu (ExpPower (Mu (ExpSqrt a)) x))  | even x = Mu $ ExpPower a $ div x 2
                                         | otherwise = Mu $ ExpPower (Mu $ ExpSqrt $ a) x
 -}
-opt (Mu (ExpPower a 0)) = Mu $ ExpScalar 1.0
+opt (Mu (ExpPower (Mu (ExpScalar 0)) 0)) = error "Undefined: 0^0"
+opt (Mu (ExpPower (Mu (ExpScalar 0)) _)) = Mu $ ExpScalar 0
+opt (Mu (ExpPower _ 0)) = Mu $ ExpScalar 1.0
 opt (Mu (ExpPower a 1)) = a
 
 opt (Mu a) = Mu $ fmap opt a

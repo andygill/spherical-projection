@@ -34,6 +34,7 @@ instance Num Scalar where
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
   abs (Scalar a) = Scalar (Mu $ ExpAbs a)
   signum (Scalar a) = Scalar (Mu $ ExpSignum a)
+  negate (Scalar a) = Scalar (Mu $ ExpNeg a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
 
 instance Fractional Scalar where
@@ -88,6 +89,8 @@ instance Num Radian where
   Radian r1 + Radian r2 = Radian $ Mu $ ExpAdd r1 r2
   Radian r1 - Radian r2 = Radian $ Mu $ ExpSub r1 r2
   Radian r1 * Radian r2 = Radian $ Mu $ ExpMul r1 r2
+  abs (Radian a) = Radian (Mu $ ExpAbs a)
+  negate (Radian a) = Radian (Mu $ ExpNeg a)
   fromInteger = Radian . Mu . ExpScalar . fromInteger
 
 instance Fractional Radian where
@@ -261,8 +264,8 @@ scalarToLong = Longitude . toRadian
 toScalar :: Radian -> Scalar
 toScalar (Radian x) = Scalar x
 
-latToScalar (Latitude (Radian x)) = x
-longToScalar (Longitude (Radian x)) = x
+latToScalar (Latitude x) = toScalar x
+longToScalar (Longitude x) = toScalar x
 
 num_piS :: Scalar
 num_piS = Scalar $ Mu $ ExpScalar $ num_pi

@@ -49,7 +49,7 @@ inverseFisheyeTransform img@Image {..} = runST $ do
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     go (x + 1) y
     go 0 0
-
+{-
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
@@ -67,6 +67,45 @@ unFisheye img@Image {..} = runST $ do
                         writePixel mimg x y $ pixelAt img x' y'
                     go (x + 1) y
     go 0 0
+-}
+
+unFisheye :: Image PixelRGB8 -> Image PixelRGB8
+unFisheye img@Image {..} = runST $ do
+    let size = min imageHeight imageWidth
+    mimg <- M.newMutableImage imageWidth imageHeight
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
+                | otherwise = do
+
+                    -- (\(t,p) -> ((p*cos(t)+0.5)*imageWidth, (p*sin(t)+0.5)*imageHeight,)) $ (\(x,y,z) -> (atan2 (-z) x, (acos y) / num_piS) $ longLatToPoint $ ((*) num_piS $ (-) 1 $ (fromIntegral x)/ (fromIntegral imageWidth), (*) num_piS $ (fromIntegral y) / (fromIntegral imageHeight))
+                    --potential example: https://github.com/raboof/dualfisheye2equirectangular/blob/master/projection.c
+                    --http://paulbourke.net/dome/fish2/fish2sphere.pdf
+                    --let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ targetPtToFishImage (35/4) $ normalize size size (x,y)
+                    --let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, (35/4), fromIntegral x, fromIntegral y)
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral x, fromIntegral y)
+                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
+                    go (x + 1) y
+    go 0 0
+--new_test :: (Scalar -> Scalar -> Scalar -> Scalar) -> (Scalar, Scalar)
+new_test = (\h w x y -> spec_unnorm h w $ (\(px,py,pz) -> (T.atan2 ((-1) * pz) x, (T.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y)
+
+spec_norm :: Scalar -> Scalar -> Scalar -> Scalar -> (Radian, Radian)
+spec_norm h w x y = (t, p)
+    where
+        t = toRadian $ num_piS * (1 - (x / w))
+        p = toRadian $ num_piS * (y / h)
+
+radToP3 :: (Radian, Radian) -> (Scalar, Scalar, Scalar)
+radToP3 (t, p) = (T.cos(t) * T.sin(p), T.sin(t) * T.sin(p), T.cos p)
+
+spec_unnorm :: Scalar -> Scalar -> (Radian, Radian) -> (Scalar, Scalar)
+spec_unnorm h w (p2,t2) = (x,y)
+    where
+        x = ((toScalar p2)*T.cos(t2::Radian)+0.5) * w
+        y = ((toScalar p2)*T.sin(t2::Radian)+0.5) * h
 
 inversePanoToLittlePlanet :: Image PixelRGB8 -> Image PixelRGB8
 inversePanoToLittlePlanet img@Image {..} = runST $ do
