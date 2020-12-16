@@ -10,7 +10,7 @@ import Image
 import Utils
 import Types
 
--- 
+-- takes an output file path, a Language Data Type, and a list of functions to be reifyed, and prints them to file.
 outputCode :: (Var a, ToExpr b) => String -> Language -> [(a -> b)] -> IO ()
 outputCode path lang fs = do
     es <- sequence $ map (\f -> do x <- reifyFunction f; return $ muConversion (maxNode x) x) fs
@@ -31,11 +31,13 @@ name :: (Var a, ToExpr b) => a -> String -> b -> b
 
 TODO∷ Figure out how to name variables before output.
 -}
+-- takes an output file path, a Language Data Type, and a list of tuples with the functions to be reifyed and a string for its name, and prints them to file.
 outputCode' :: (Var a, ToExpr b) => String -> String -> Language -> [(String,(a -> b))] -> IO ()--[((String,[String]),(a -> b))] -> IO ()
 outputCode' path modname lang fs = do
     es <- sequence $ map (\(n,f) -> do x <- reifyFunction f; return (n, muConversion (maxNode x) x)) fs
     transliterate' path modname lang es
 
+-- takes an output file path, a Language Data Type, and a list of tuples with the functions to be reifyed, a string for the function name and an ordered list of input variable names (strings), and prints them to file.
 outputCode'' :: (Var a, ToExpr b) => String -> String -> Language -> [(String, [String], (a -> b))] -> IO ()--[((String,[String]),(a -> b))] -> IO ()
 outputCode'' path modname lang fs = do
     es <- sequence $ map (\(n, as, f) -> do x <- reifyFunction f; return (n, as, muConversion (maxNode x) x)) fs
@@ -49,25 +51,28 @@ transliterate path lang fs = writeFile path output_string
         labelFcn i (x:xs) = ("f" ++ (show i) ++ " = " ++ x):(labelFcn (i+1) xs)
         output_string = unlines $ labelFcn 1 $ map (\f@(ExprFunction as vs r)-> (showLang lang) $ muConversion (V $ (length as) + length vs) f) fs
 
+-- same as above but can write a function name as well
 transliterate' :: String -> String -> Language -> [(String, ExprFunction)] -> IO ()
 transliterate' path modname lang fs = writeFile path $ unlines $ (++) modstring $ map fn fs
     where
         modstring = ["module " ++ modname ++ " where"]
         fn = (\(n,f@(ExprFunction as vs r))-> (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f)
 
+-- same as above, but also changes the input variables to the strings supplied
 transliterate'' :: String -> String -> Language -> [(String, [String], ExprFunction)] -> IO ()
 transliterate'' path modname lang fs = writeFile path $ unlines $ (++) modstring $ map fn fs
     where
         modstring = ["module " ++ modname ++ " where"]
         fn = (\(n, names, f@(ExprFunction as vs r))-> checkString names (map show as) $ (++) (n ++ " = ") $ (showLang lang) $ muConversion (V $ (length as) + length vs) f)
 
-
+-- a utility function that allows for prettier function composition
 showLang :: Language -> (ExprFunction -> String)
 showLang lang = case lang of
                     JS      -> show . JavaScript
                     HSKL    -> show . Haskell
                     _       -> error "unknown language"
 
+-- A special find and replace function that is used to replace variable names
 findAndReplace :: (String, Int, String) -> Int -> String -> String
 findAndReplace a@(k,lk,r) sl (s:ss) | lk > sl = (s:ss)
                                     | not $ isAlphaNum s = [s] ++ (findAndReplace a (sl - 1) ss)
@@ -81,6 +86,7 @@ findAndReplace a@(k,lk,r) sl (s:ss) | lk > sl = (s:ss)
                                             r
                                     | otherwise = [s] ++ (findAndReplace a (sl - 1) ss)
 
+
 checkString :: [String] -> [String] -> String -> String
 checkString [] _ s = s
 checkString _ [] s = s
@@ -89,6 +95,7 @@ checkString (n:ns) (a:as) s | n == "" = checkString ns as s
 --    where
 --        new_s = unwords . (map (\x -> findAndReplace (a, length a, n) (length x) x)) . words
 
+-- used for writing the QuickCheck functions
 compareCode :: String -> ExprFunction -> IO ()
 compareCode path f@(ExprFunction as vs r) = do
     let vStart = maxNode f
@@ -101,11 +108,13 @@ compareCode path f@(ExprFunction as vs r) = do
                         ["f1 = " ++ (show f1), "f2 = " ++ (show f2)]
     writeFile path output_string
 
+-- Maaking in input variables doubles for QuickCheck
 castDouble :: [String] -> String
 castDouble [] = ""
 castDouble (a:as)   | null as = a ++ "::Double"
                     | otherwise = a ++ "::Double, " ++ (castDouble as)
 
+-- Used in changing the tuples stored as lists into haskell form tuples
 listToTuple' :: [String] -> String
 listToTuple' [] = ""
 listToTuple' (x:[]) = x
@@ -122,6 +131,7 @@ listToTuple (x:xs) = (show x) ++ ", " ++ (listToTuple xs)
 
 newtype JavaScript = JavaScript ExprFunction
 
+-- the specialized function writer for Javascript based off the ExprFunction and how show is implemented in Expr.hs
 instance Show JavaScript where
   show (JavaScript (ExprFunction as xs r)) = unlines $
       ["((" ++ (if null as then "" else show as) ++ ") => {"] ++
@@ -157,9 +167,12 @@ instance Show JavaScript where
 
 newtype Haskell = Haskell ExprFunction
 
+
 normListToString :: Int -> [V] -> String
 normListToString n [] = ""
 normListToString n (x:xs) = (show x) ++ "*" ++ (show x) ++ if n == 1 then "" else " + " ++ (normListToString (n-1) xs)
+
+-- the specialized function writer for Haskell based off the ExprFunction and how show is implemented in Expr.hs
 
 instance Show Haskell where
   show (Haskell (ExprFunction as xs r)) = unlines $
@@ -195,13 +208,14 @@ showHaskell v se = "    let " ++ show v ++ " = " ++ se ++ " in"
 
 -----------------------------------------------------------------------------------------------
 
-
+-- This is a writer function that takes a list of functions and their names,runs them through the optimizer, and outputs them in valid Haskell used in image manipulations
 regenFunctions :: IO ()
 regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
     where
         unFisheye = ("unFisheyeTransform", (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
         inverseFisheye = ("inverseFisheye", (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
 
+-- Same as above, but you can name the input variables
 regenFunctions' :: IO ()
 regenFunctions' = outputCode'' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
     where
