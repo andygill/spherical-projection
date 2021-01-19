@@ -124,6 +124,13 @@ listToTuple' (x:xs) = x ++ ", " ++ (listToTuple' xs)
 
 data Language = JS | HSKL | C
 
+langExt :: Language -> String
+langExt lang = case lang of
+        JS -> ".js"
+        HSKL -> ".hs"
+        C -> ".c"
+        _ -> error "Unknown Language token"
+
 listToTuple :: Show a => [a] -> String
 listToTuple [] = ""
 listToTuple (x:[]) = show x
@@ -192,7 +199,7 @@ instance Show Haskell where
       showAssign (v,ExpSqrt e)      = showHaskell v $ "sqrt " ++ show e
       showAssign (v,ExpAbs e)       = showHaskell v $ "abs " ++ show e
       showAssign (v,ExpSignum e)    = showHaskell v $ "signum " ++ show e
-      showAssign (v,ExpNeg e)       = showHaskell v $ "neg " ++ show e
+      showAssign (v,ExpNeg e)       = showHaskell v $ "negate " ++ show e
       showAssign (v,ExpAdd e1 e2)   = showHaskell v $ show e1 ++ " + " ++ show e2
       showAssign (v,ExpSub e1 e2)   = showHaskell v $ show e1 ++ " - " ++ show e2
       showAssign (v,ExpMul e1 e2)   = showHaskell v $ show e1 ++ " * " ++ show e2
@@ -216,10 +223,12 @@ regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFishey
         inverseFisheye = ("inverseFisheye", (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
 
 -- Same as above, but you can name the input variables
-regenFunctions' :: IO ()
-regenFunctions' = outputCode'' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFisheye]
+regenFunctions' :: Language -> IO ()
+regenFunctions' lang = outputCode'' ("./funcs" ++ (langExt lang)) "Funcs" lang [unFisheye, inverseFisheye, sphere2planeStereo, lambertTransform]
     where
 --        unFisheye = ("unFisheyeTransform", ["height", "width", "aperture", "x", "y"], (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
-
-        unFisheye = ("unFisheyeTransform", ["height", "width", "x", "y"], (\ h w x y _ _-> spec_unnorm h w $ (\(px,py,pz) -> (Types.atan2 ((-1) * pz) px, (Types.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y))
+        unFisheye = ("unFisheyeTransform", ["height", "width", "x", "y"], (\ h w x y _ _-> spec_unnorm h w $ (\(px,py,pz) -> (Types.atan2 pz px, (Types.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y))
         inverseFisheye = ("inverseFisheye", ["height", "width", "side", "aperture", "x", "y"], (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
+        sphere2planeStereo = ("sphere2planeStereo", ["phi", "theta"], (\ p t _ _ _ _ -> rectilinear2point2D $ fromSteroToRectilinear (0,0) (scalarToLong p, scalarToLat t)))
+        --lambertTransform = ("lambertTransform", ["height", "width", "s", "x", "y"], (\ h w s x y _-> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ lambertFrom2DToSphere $ normalize'' s s (x,y)))
+        lambertTransform = ("lambertTransform", ["height", "width", "size", "s", "x", "y"], (\ h w size s x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ lambertFrom2DToSphere $ lambertNorm size s (x,y)))

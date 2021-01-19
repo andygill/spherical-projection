@@ -82,15 +82,43 @@ unFisheye img@Image {..} = runST $ do
                     --http://paulbourke.net/dome/fish2/fish2sphere.pdf
                     --let (x',y') = unnormalize imageHeight imageWidth $ extractTuple $ evalMu $ toMuExpr $ targetPtToFishImage (35/4) $ normalize size size (x,y)
                     --let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, (35/4), fromIntegral x, fromIntegral y)
-                    let (x',y') = (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral x, fromIntegral y)
-                    if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
+                    let (x',y') = placeInBound imageHeight imageWidth $ (\(a,b) -> (round a, round b)) $ unFisheyeTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral x, fromIntegral y)
+                    writePixel mimg x y $ pixelAt img x' y'
+                    go (x + 1) y
+    go 0 0
+
+lambert :: Image PixelRGB8 -> Image PixelRGB8
+lambert img@Image {..} = runST $ do
+    let size = min imageHeight imageWidth
+    mimg <- M.newMutableImage size size
+    let go x y  | x >= size = go 0 $ y + 1
+                | y >= size = M.freezeImage mimg
+                | otherwise = do
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ lambertTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, 2, fromIntegral x, fromIntegral y)
+                    if x' < 0 || x' >= imageWidth || y' < 0 || y' >= imageHeight
+                    then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
                         writePixel mimg x y $ pixelAt img x' y'
                     go (x + 1) y
     go 0 0
+
+lambertNorm :: Scalar -> Scalar -> Point2D -> Point2D
+lambertNorm size s (x,y) = translate (-1) 1 $ normalize'' size size (s * x, s * y)
+{-}
+lambertUnnorm :: :: Scalar -> Scalar -> Point2D -> Point2D
+lambertUnnorm h w p = (x - (w/4), y - (h/4))
+    where
+        (x,y) = unnormalize' p
+-}
+placeInBound :: Int -> Int -> (Int, Int) -> (Int, Int)
+placeInBound h w (x,y)  | x < 0 = placeInBound h w (0,y)
+                        | x >= w = placeInBound h w (w - 1, y)
+                        | y < 0 = placeInBound h w (x, 0)
+                        | y >= h = placeInBound h w (x, h - 1)
+                        | otherwise = (x,y)
 --new_test :: (Scalar -> Scalar -> Scalar -> Scalar) -> (Scalar, Scalar)
-new_test = (\h w x y -> spec_unnorm h w $ (\(px,py,pz) -> (T.atan2 ((-1) * pz) x, (T.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y)
+new_test = (\h w x y -> spec_unnorm h w $ (\(px,py,pz) -> (T.atan2 pz x, (T.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y)
 
 spec_norm :: Scalar -> Scalar -> Scalar -> Scalar -> (Radian, Radian)
 spec_norm h w x y = (t, p)
@@ -204,6 +232,9 @@ unnormalize' h w (x', y') = ((w / 2) * (1 + x'), (h / 2) * (1 - y'))
 
 point2DtoRectilinear :: Point2D -> Rectilinear
 point2DtoRectilinear (x,y) = Rectilinear x y
+
+rectilinear2point2D :: Rectilinear -> Point2D
+rectilinear2point2D (Rectilinear x y) = (x,y)
 
 pixelCoordToLongLat :: Height -> Width -> PixelCoord -> (Longitude, Latitude)
 pixelCoordToLongLat h w p = normPoint2DToLongLat $ normalize h w p

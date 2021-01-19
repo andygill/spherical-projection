@@ -28,6 +28,7 @@ main = do
                     "3" -> "inversePanoToLittlePlanet"
                     "4" -> "panoToLittlePlanet"
                     "5" -> "panoToGnomic"
+                    "6" -> "lambert"
                     _   -> error "Invalid transform option"
                 s = case ext of
                     "png"   -> writePng pathTo
@@ -40,5 +41,6 @@ main = do
                     "3" -> inversePanoToLittlePlanet
                     "4" -> panoToLittlePlanet
                     "5" -> panoToGnomic
+                    "6" -> lambert
                     _   -> error "Invalid transform option"
     print "done"
