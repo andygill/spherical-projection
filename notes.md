@@ -2,13 +2,23 @@
 
 [Katex](https://docs.gitlab.com/ee/user/markdown.html#math) for the math
 
-## 1/18/2021
+## 1/19/2021
+### TODO
+1. Make a function to "rotate" the origin of the input image for lambert. The lambert projection is centered at z = -1, so I want to be able to determine where the new origin should be
+2. See if forcing a hemi-sphere to to become the whole sphere, and then applying the lambert projection gives the fisheye effect
+3. Make the opposite form of the lambert projection
 
+### Notes:
+What I actually did today:
+ - added a rotate utility function that rotates an image's axis after being put onto a sphere's surface
+ - applied rotate to the lambert function to see what images look like when you "look" at them from different angles
+
+## 1/18/2021
 ### TODO
 1. make a model of a 2D image
+ - Instead, I just made the lambert projection... It looked like the fisheye so why not?
 
 ## 1/15/2021
-
 ### TODO
 1. Wireframe a Basic Landing Page for spherical projections
 2. test how to transform vertex point on a sphere via projection (just transform each vertex and keep connections)

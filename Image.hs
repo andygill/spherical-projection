@@ -29,6 +29,40 @@ squareImage :: Pixel a => Image a -> Image a
 squareImage img = generateImage (\x y -> pixelAt img x y) edge edge
     where
         edge = min (imageWidth img) (imageHeight img)
+{-}
+smoothImage :: Image PixelRGB8 -> Image PixelRGB8
+smoothImage img@Image{..} = generateImage (\x y -> averagePixel img x y) imageWidth imageHeight
+
+averagePixel :: Image PixelRGB8 -> Int -> Int -> PixelRGB8
+averagePixel img x y = PixelRGB8 r g b
+    where
+
+errorPixel :: Image PixelRGB8 -> Int -> Int -> PixelRGB8
+errorPixel img@Image{..} | x < 0
+
+bilerp :: Image PixelRGB8 -> Image PixelRGB8
+bilerp img = generateImage (\ x y -> bilerpPixel x y img) (imageWidth img) (imageHeight img)
+-}
+bilerpPixel :: Image PixelRGB8 -> Double -> Double -> PixelRGB8
+bilerpPixel img x y = PixelRGB8 r g b
+    where
+        fx = floor x
+        cx = ceiling x
+        fy = floor y
+        cy = ceiling y
+        (PixelRGB8 r00 g00 b00) = pixelAt img fx fy
+        (PixelRGB8 r01 g01 b01) = pixelAt img fx cy
+        (PixelRGB8 r10 g10 b10) = pixelAt img cx fy
+        (PixelRGB8 r11 g11 b11) = pixelAt img cx cy
+        dx = x - (fromIntegral fx)
+        dy = y - (fromIntegral fy)
+        r = round $ (1 - dx)*(1 - dy)*(fromIntegral r00) + dx*(1 - dy)*(fromIntegral r01) + (1 - dx)*dy*(fromIntegral r10) + dx*dy*(fromIntegral r11)
+        g = round $ (1 - dx)*(1 - dy)*(fromIntegral g00) + dx*(1 - dy)*(fromIntegral g01) + (1 - dx)*dy*(fromIntegral g10) + dx*dy*(fromIntegral g11)
+        b = round $ (1 - dx)*(1 - dy)*(fromIntegral b00) + dx*(1 - dy)*(fromIntegral b01) + (1 - dx)*dy*(fromIntegral b10) + dx*dy*(fromIntegral b11)
+
+{-}
+lerpPixels :: Int -> Int -> Int -> Int -> ImageRGB8 -> PixelRGB8
+lerpPixels x1 y1 x2 y2 img =-}
 
 -- reference this: https://www.stackbuilders.com/tutorials/haskell/image-processing/
 inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
@@ -87,14 +121,37 @@ unFisheye img@Image {..} = runST $ do
                     go (x + 1) y
     go 0 0
 
-lambert :: Image PixelRGB8 -> Image PixelRGB8
-lambert img@Image {..} = runST $ do
+
+rotateOrigin :: Double2D -> DynamicImage -> DynamicImage
+rotateOrigin origin img = dynamicPixelMap (remapOrigin p) img
+    where
+        p = findLambertOrigin (dynHeight img) (dynWidth img) origin
+
+remapOrigin :: Pixel a => PixelCoord -> Image a -> Image a
+remapOrigin (x_0, y_0) img@Image {..} = generateImage (\x y -> (\(x',y') -> pixelAt img x' y') $ wrapOrigin imageHeight imageWidth (x - x_0 + mx, y - y_0 + my)) imageWidth imageHeight
+    where
+        mx = div imageWidth 2
+        my = div imageHeight 2
+
+findLambertOrigin :: Int -> Int -> Double2D -> PixelCoord
+findLambertOrigin h w (long, lat) = unnormalize h w (long/180, lat/90)
+
+-- PRE: Change origin by x' = x - x_0; y' = y - y_0
+wrapOrigin :: Int -> Int -> PixelCoord -> PixelCoord
+wrapOrigin h w (x,y)| x < 0  = wrapOrigin h w (w + x, y)
+                    | x >= w = wrapOrigin h w (w - x, y)
+                    | y < 0  = wrapOrigin h w (x, h + y)
+                    | y >= h = wrapOrigin h w (x, h - y)
+                    | otherwise = (x,y)
+
+lambertEq2Circle :: Image PixelRGB8 -> Image PixelRGB8
+lambertEq2Circle img@Image {..} = runST $ do
     let size = min imageHeight imageWidth
     mimg <- M.newMutableImage size size
     let go x y  | x >= size = go 0 $ y + 1
                 | y >= size = M.freezeImage mimg
                 | otherwise = do
-                    let (x',y') = (\(a,b) -> (round a, round b)) $ lambertTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, 2, fromIntegral x, fromIntegral y)
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ lambertEq2CircTransform (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, 2, fromIntegral x, fromIntegral y)
                     if x' < 0 || x' >= imageWidth || y' < 0 || y' >= imageHeight
                     then
                         writePixel mimg x y $ PixelRGB8 0 0 0
@@ -105,12 +162,46 @@ lambert img@Image {..} = runST $ do
 
 lambertNorm :: Scalar -> Scalar -> Point2D -> Point2D
 lambertNorm size s (x,y) = translate (-1) 1 $ normalize'' size size (s * x, s * y)
-{-}
-lambertUnnorm :: :: Scalar -> Scalar -> Point2D -> Point2D
-lambertUnnorm h w p = (x - (w/4), y - (h/4))
-    where
-        (x,y) = unnormalize' p
+
+lambertUnNorm :: Scalar -> Scalar -> Point2D -> Point2D
+lambertUnNorm size s (x,y) = unnormalize' size size (s * x, s * y)--translate (-1) 1 $ unnormalize' size size (s * x, s * y)
+
+lambertCircle2Eq :: Image PixelRGB8 -> Image PixelRGB8
+lambertCircle2Eq img@Image {..} = runST $ do
+    let width = imageHeight*2
+    mimg <- M.newMutableImage width imageHeight
+    let go x y  | x >= width = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
+                | otherwise = do
+                    -- side, height, width, x, y
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
+                    {-let (x',y') = lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
+                    if x' < 0 || x' >= fromIntegral imageHeight - 1 || y' < 0 || y' >= fromIntegral imageHeight - 1
+                    then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ bilerpPixel img x' y'-}
+                    if x' < 0 || x' >= imageHeight || y' < 0 || y' >= imageHeight
+                    then
+                        writePixel mimg x y $ PixelRGB8 0 0 0
+                    else
+                        writePixel mimg x y $ pixelAt img x' y'
+
+                    go (x + 1) y
+    go 0 0
+
+-- subtract by the origin, transform from spherical to UV, normalize UV to input image dimensions
+-- this cannot work b/c it will create overly negative or positive values. So it must be done from the looping level
+{-
+lambertUnnorm :: Scalar -> Scalar -> (Longitude, Latitude) -> (Longitude, Latitude) -> Point2D
+lambertUnnorm h w (long_0,lat_0) (long, lat) = unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) (long - long_0, lat - lat_0)
 -}
+
+degree2radian :: Double2D -> Double2D
+degree2radian (long, lat) = (long*pi/180, lat*pi/180)
+
+
+
 placeInBound :: Int -> Int -> (Int, Int) -> (Int, Int)
 placeInBound h w (x,y)  | x < 0 = placeInBound h w (0,y)
                         | x >= w = placeInBound h w (w - 1, y)

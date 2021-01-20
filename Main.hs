@@ -20,7 +20,7 @@ main = do
             putStrLn $ "File Save format: " ++ ext
             putStrLn $ "From File: \"" ++ pathFrom ++ "\""
             putStrLn $ "Save Path: \"" ++ pathTo ++ "\""
-            (s . f . convertRGB8) img
+            (s . f) img
             where
                 t = case transform of
                     "1" -> "inverseFisheyeTransform"
@@ -28,7 +28,9 @@ main = do
                     "3" -> "inversePanoToLittlePlanet"
                     "4" -> "panoToLittlePlanet"
                     "5" -> "panoToGnomic"
-                    "6" -> "lambert"
+                    "6" -> "lambertEq2Circle"
+                    "7" -> "lambertCircle2Eq"
+                    "10" -> "rotateOrigin"
                     _   -> error "Invalid transform option"
                 s = case ext of
                     "png"   -> writePng pathTo
@@ -36,11 +38,13 @@ main = do
                     "tga"   -> writeTga pathTo
                     _       -> error "Invalid extension"
                 f = case transform of
-                    "1" -> inverseFisheyeTransform . squareImage
-                    "2" -> unFisheye
-                    "3" -> inversePanoToLittlePlanet
-                    "4" -> panoToLittlePlanet
-                    "5" -> panoToGnomic
-                    "6" -> lambert
+                    "1" -> inverseFisheyeTransform . squareImage . convertRGB8
+                    "2" -> unFisheye . convertRGB8
+                    "3" -> inversePanoToLittlePlanet . convertRGB8
+                    "4" -> panoToLittlePlanet . convertRGB8
+                    "5" -> panoToGnomic . convertRGB8
+                    "6" -> lambertEq2Circle . convertRGB8
+                    "7" -> lambertCircle2Eq . convertRGB8
+                    "10" -> convertRGB8 . rotateOrigin (0,90)
                     _   -> error "Invalid transform option"
     print "done"
