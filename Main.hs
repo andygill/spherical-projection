@@ -31,6 +31,7 @@ main = do
                     "6" -> "lambertEq2Circle"
                     "7" -> "lambertCircle2Eq"
                     "10" -> "rotateOrigin"
+                    "11" -> "smoothImage"
                     _   -> error "Invalid transform option"
                 s = case ext of
                     "png"   -> writePng pathTo
@@ -46,5 +47,6 @@ main = do
                     "6" -> lambertEq2Circle . convertRGB8
                     "7" -> lambertCircle2Eq . convertRGB8
                     "10" -> convertRGB8 . rotateOrigin (0,90)
+                    "11" -> smoothImage . convertRGB8
                     _   -> error "Invalid transform option"
     print "done"

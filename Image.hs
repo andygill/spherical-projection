@@ -29,20 +29,26 @@ squareImage :: Pixel a => Image a -> Image a
 squareImage img = generateImage (\x y -> pixelAt img x y) edge edge
     where
         edge = min (imageWidth img) (imageHeight img)
-{-}
+
 smoothImage :: Image PixelRGB8 -> Image PixelRGB8
-smoothImage img@Image{..} = generateImage (\x y -> averagePixel img x y) imageWidth imageHeight
-
-averagePixel :: Image PixelRGB8 -> Int -> Int -> PixelRGB8
-averagePixel img x y = PixelRGB8 r g b
+smoothImage img@Image{..} = generateImage inBoundPixel imageWidth imageHeight
     where
+        inBoundPixel x y=if x >= imageWidth - 1
+                        then
+                            if y == imageHeight - 1
+                                then pixelAt img x y
+                                else lerpPixelY img (0.5 + (fromIntegral y)) x
+                        else if y >= imageHeight - 1
+                            then
+                                if x == imageWidth - 1
+                                    then pixelAt img x y
+                                    else lerpPixelX img (0.5 + (fromIntegral x)) y
+                            else
+                                bilerpPixel img (0.5 + (fromIntegral x)) $ 0.5 + (fromIntegral y)
 
-errorPixel :: Image PixelRGB8 -> Int -> Int -> PixelRGB8
-errorPixel img@Image{..} | x < 0
+--bilerp :: Image PixelRGB8 -> Image PixelRGB8
+--bilerp img = generateImage (\ x y -> bilerpPixel x y img) (imageWidth img) (imageHeight img)
 
-bilerp :: Image PixelRGB8 -> Image PixelRGB8
-bilerp img = generateImage (\ x y -> bilerpPixel x y img) (imageWidth img) (imageHeight img)
--}
 bilerpPixel :: Image PixelRGB8 -> Double -> Double -> PixelRGB8
 bilerpPixel img x y = PixelRGB8 r g b
     where
@@ -59,6 +65,33 @@ bilerpPixel img x y = PixelRGB8 r g b
         r = round $ (1 - dx)*(1 - dy)*(fromIntegral r00) + dx*(1 - dy)*(fromIntegral r01) + (1 - dx)*dy*(fromIntegral r10) + dx*dy*(fromIntegral r11)
         g = round $ (1 - dx)*(1 - dy)*(fromIntegral g00) + dx*(1 - dy)*(fromIntegral g01) + (1 - dx)*dy*(fromIntegral g10) + dx*dy*(fromIntegral g11)
         b = round $ (1 - dx)*(1 - dy)*(fromIntegral b00) + dx*(1 - dy)*(fromIntegral b01) + (1 - dx)*dy*(fromIntegral b10) + dx*dy*(fromIntegral b11)
+
+--linear interpolates in the x direction
+lerpPixelX :: Image PixelRGB8 -> Double -> Int -> PixelRGB8
+lerpPixelX img x y = PixelRGB8 r g b
+    where
+        fx = floor x
+        cx = ceiling x
+        (PixelRGB8 r0 g0 b0) = pixelAt img fx y
+        (PixelRGB8 r1 g1 b1) = pixelAt img cx y
+        dx = x - (fromIntegral fx)
+        r = round $ (1 - dx)*(fromIntegral r0) + dx*(fromIntegral r1)
+        g = round $ (1 - dx)*(fromIntegral g0) + dx*(fromIntegral g1)
+        b = round $ (1 - dx)*(fromIntegral b0) + dx*(fromIntegral b1)
+
+--linear interpolates in the y direction
+lerpPixelY :: Image PixelRGB8 -> Double -> Int -> PixelRGB8
+lerpPixelY img y x = PixelRGB8 r g b
+    where
+        fy = floor y
+        cy = ceiling y
+        (PixelRGB8 r0 g0 b0) = pixelAt img x fy
+        (PixelRGB8 r1 g1 b1) = pixelAt img x cy
+        dy = y - (fromIntegral fy)
+        r = round $ (1 - dy)*(fromIntegral r0) + dy*(fromIntegral r1)
+        g = round $ (1 - dy)*(fromIntegral g0) + dy*(fromIntegral g1)
+        b = round $ (1 - dy)*(fromIntegral b0) + dy*(fromIntegral b1)
+
 
 {-}
 lerpPixels :: Int -> Int -> Int -> Int -> ImageRGB8 -> PixelRGB8
@@ -174,18 +207,19 @@ lambertCircle2Eq img@Image {..} = runST $ do
                 | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
                     -- side, height, width, x, y
-                    let (x',y') = (\(a,b) -> (round a, round b)) $ lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
-                    {-let (x',y') = lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
+                    let (x',y') = lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
                     if x' < 0 || x' >= fromIntegral imageHeight - 1 || y' < 0 || y' >= fromIntegral imageHeight - 1
                     then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
-                        writePixel mimg x y $ bilerpPixel img x' y'-}
+                        writePixel mimg x y $ bilerpPixel img x' y'
+                    {-let (x',y') = (\(a,b) -> (round a, round b)) $ lambertCirc2EqTransform (fromIntegral imageHeight, fromIntegral imageHeight, fromIntegral width, 1/2, fromIntegral x, fromIntegral y)
+
                     if x' < 0 || x' >= imageHeight || y' < 0 || y' >= imageHeight
                     then
                         writePixel mimg x y $ PixelRGB8 0 0 0
                     else
-                        writePixel mimg x y $ pixelAt img x' y'
+                        writePixel mimg x y $ pixelAt img x' y'-}
 
                     go (x + 1) y
     go 0 0
@@ -199,8 +233,6 @@ lambertUnnorm h w (long_0,lat_0) (long, lat) = unnormalize' h w $ (\(x',y') ->((
 
 degree2radian :: Double2D -> Double2D
 degree2radian (long, lat) = (long*pi/180, lat*pi/180)
-
-
 
 placeInBound :: Int -> Int -> (Int, Int) -> (Int, Int)
 placeInBound h w (x,y)  | x < 0 = placeInBound h w (0,y)
