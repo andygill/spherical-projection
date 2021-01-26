@@ -1,0 +1,46 @@
+---
+layout: page
+---
+{% assign projection = null %}
+{% for item in site.data.projections %}
+    {% if item.filename == page.filename %}
+        {% assign projection = item %}
+        {% break %}
+    {% endif %}
+{% endfor %}
+
+<h4> Projection Type: {{projection.type}}</h4>
+<br>
+<br>
+<h2> Background </h2>
+<br>
+{{projection.background}}
+<br>
+<h2> Mathematics </h2>
+<br>
+{{projection.math_blurb}}
+<br>
+<h2> Three.js Example </h2>
+
+{% include threejs_template.html %}
+{% comment %}
+<h2> Code Snippets </h2>
+<h3> Basic Mathematics Code </h3>
+{{projection.general_code.notes}}
+{% highlight javascript %}
+{% include {{projection.threejs.href}} %}
+{% endhighlight %}
+
+### Pixel-Based Mathematics Code
+{{projection.pixel_code.notes}}
+{% highlight javascript %}
+{% include {{projection.pixel_code.href}} %}
+{% endhighlight %}
+
+### Three.js Example Code
+{{projection.threejs.notes}}
+{% highlight javascript %}
+{% include {{projection.threejs.href}} %}
+{% endhighlight %}
+
+{% endcomment %}

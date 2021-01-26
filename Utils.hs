@@ -100,6 +100,20 @@ algebraicStereoThroughPos1 ap (x,y) = pointToLongLat (x * t, y * t, (2*t) - 1)
         r_sq = ap * (x*x + y*y)
         t = 4 / (r_sq + 4)
 
+--https://en.wikipedia.org/wiki/Lambert_azimuthal_equal-area_projection
+-- lambert projections
+lambertFrom2DToSphere :: Point2D -> (Longitude, Latitude)
+lambertFrom2DToSphere (x,y) = pointToLongLat (x * scaleIt, y * scaleIt , (r2/2) - 1)
+    where
+        r2 = x*x + y*y
+        scaleIt = sqrt $ 1 - (r2/4)
+
+lambertFromSphereto2D :: (Longitude, Latitude) -> Point2D
+lambertFromSphereto2D p = (s*x, s*y)
+    where
+        (x,y,z) = longLatToPoint p
+        s = sqrt (2 / (1-z))
+
 translate :: Scalar -> Scalar -> Point2D -> Point2D
 translate dx dy (x,y) = (x + dx, y + dy)
 

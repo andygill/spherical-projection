@@ -1,0 +1,7 @@
+
+<canvas id="c"></canvas>
+{% assign link = "/general_code/" | append: {{page.filename}} | append: ".js"%}
+
+<script type="text/javascript" src={{link | relative_url}}></script>
+{% assign link = "/threejs/" | append: {{page.filename}} | append: ".js" %}
+<script type="text/javascript" src={{link | relative_url}}></script>

@@ -34,6 +34,7 @@ instance Num Scalar where
   Scalar a * Scalar b = Scalar (Mu $ ExpMul a b)
   abs (Scalar a) = Scalar (Mu $ ExpAbs a)
   signum (Scalar a) = Scalar (Mu $ ExpSignum a)
+  negate (Scalar a) = Scalar (Mu $ ExpNeg a)
   fromInteger = Scalar . Mu . ExpScalar . fromInteger
 
 instance Fractional Scalar where
@@ -88,6 +89,8 @@ instance Num Radian where
   Radian r1 + Radian r2 = Radian $ Mu $ ExpAdd r1 r2
   Radian r1 - Radian r2 = Radian $ Mu $ ExpSub r1 r2
   Radian r1 * Radian r2 = Radian $ Mu $ ExpMul r1 r2
+  abs (Radian a) = Radian (Mu $ ExpAbs a)
+  negate (Radian a) = Radian (Mu $ ExpNeg a)
   fromInteger = Radian . Mu . ExpScalar . fromInteger
 
 instance Fractional Radian where
@@ -148,6 +151,7 @@ instance Num Longitude where
   fromInteger = Longitude . fromInteger
 
 instance Fractional Longitude where
+  Longitude a / Longitude b = Longitude (a / b)
   fromRational = Longitude . fromRational
 
 instance Conditional Longitude where
@@ -164,6 +168,7 @@ instance Num Latitude where
     fromInteger = Latitude . fromInteger
 
 instance Fractional Latitude where
+  Latitude a / Latitude b = Latitude (a / b)
   fromRational = Latitude . fromRational
 
 instance Conditional Latitude where

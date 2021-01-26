@@ -15,7 +15,7 @@ import qualified Data.Graph as G
 import Data.Function(on)
 import Data.List(sortBy)
 
-import Prelude hiding (sin, cos, atan2, (^))
+import Prelude hiding (sin, cos, atan2, (^), negate)
 import qualified Prelude as P
 
 data Expr :: * -> * where
@@ -266,12 +266,13 @@ instance Eval Value where
   eval (ExpSub (Double a) (Double b)) = Double $ a - b
   eval (ExpMul (Double a) (Double b)) = Double $ a * b
   eval (ExpDiv (Double a) (Double b)) = Double $ a / b
-  eval (ExpPower (Double a) b) = Double $ a P.^ b
+  eval (ExpPower (Double a) b)  | b < 0 = Double $ 1 / (a P.^ (P.negate b))
+                                | otherwise = Double $ a P.^ b
   eval (ExpAtan2 (Double a) (Double b)) = Double $ P.atan2 a b
   eval (ExpSqrt (Double n)) = Double $ sqrt n
   eval (ExpAbs (Double n)) = Double $ abs n
   eval (ExpSignum (Double n)) = Double $ signum n
-  eval (ExpNeg (Double n)) = Double $ negate n
+  eval (ExpNeg (Double n)) = Double $ P.negate n
   eval (ExpNorm ns) = Double $ sqrt $ foldr ((+) . (P.^2)) 0 $ map (\ (Double x)-> x) ns
   eval (ExpTuple ns) = Tuple ns
   eval (ExpIfZero (Double z) a b)
