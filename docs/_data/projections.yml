@@ -1,7 +1,59 @@
-- title: Equirectangular
-- link: /projections/equirectangular
-- threejs : /h
+- filename: stereographic
+  title: Stereographic Projection
+  link: /projections/stereographic
+  background:
+  math_blurb:
 
-- title: Gnomic
-- link: /projections/gnomic
-- threejs : /h
+- filename: perspective
+  title: Perspective Projection
+  link: /projections/perspective
+  background:
+  math_blurb:
+
+- filename: equirectangular
+  title: Equirectangular Projection
+  type: Area Preserving Stereographic
+  link: /projections/equirectangular
+  background:
+  math_blurb:
+  threejs:
+      - href:
+        notes:
+  general_code:
+      - href:
+        notes:
+  pixel_code:
+      - href:
+        notes:
+
+- filename: lambert-ea-azimuthal
+  title: Lambert Equal-Area Azimuthal Projection
+  type: Area Preserving Stereographic
+  link: /projections/equirectangular
+  background:
+  math_blurb:
+  threejs:
+      - href: /threejs/lambert-ea-azimuthal.js
+        notes:
+  general_code:
+      - href: /general_code/lambert-ea-azimuthal.js
+        notes:
+  pixel_code:
+      - href: /pixel_code/lambert-ea-azimuthal.js
+        notes:
+
+- filename: gnomic
+  title: Gnomic Projection
+  type: Linear Preserving Stereographic
+  link: /projections/gnomic
+  background:
+  math_blurb:
+  threejs:
+      - href:
+        notes:
+  general_code:
+      - href:
+        notes:
+  pixel_code:
+      - href:
+        notes:
