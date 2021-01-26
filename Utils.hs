@@ -114,6 +114,15 @@ lambertFromSphereto2D p = (s*x, s*y)
         (x,y,z) = longLatToPoint p
         s = sqrt (2 / (1-z))
 
+--https://en.wikipedia.org/wiki/Curvilinear_perspective
+-- Curvilinear
+rectilinearToCurvilinear :: Scalar -> Point -> Point2D
+rectilinearToCurvilinear r (x,y,z) = (x*s, y*s)
+    where
+        s = (/) r $ sqrt $ x*x + y*y + z*z
+{-
+curvilinearToRectilinear ::
+-}
 translate :: Scalar -> Scalar -> Point2D -> Point2D
 translate dx dy (x,y) = (x + dx, y + dy)
 

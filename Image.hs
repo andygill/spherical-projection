@@ -98,24 +98,22 @@ lerpPixels :: Int -> Int -> Int -> Int -> ImageRGB8 -> PixelRGB8
 lerpPixels x1 y1 x2 y2 img =-}
 
 -- reference this: https://www.stackbuilders.com/tutorials/haskell/image-processing/
-inverseFisheyeTransform :: Image PixelRGB8 -> Image PixelRGB8
-inverseFisheyeTransform img@Image {..} = runST $ do
-    let size = min imageHeight imageWidth
-    mimg <- M.newMutableImage size size
-    let go x y  | x >= size = go 0 $ y + 1
-                | y >= size = M.freezeImage mimg
+
+equirecTofisheye :: Image PixelRGB8 -> Image PixelRGB8
+equirecTofisheye img@Image {..} = runST $ do
+    let side = min imageWidth imageHeight
+    mimg <- M.newMutableImage side side
+    let go x y  | x >= imageWidth = go 0 $ y + 1
+                | y >= imageHeight = M.freezeImage mimg
                 | otherwise = do
-                    let (x1,y1) = normalize' size size (x,y)
-                    if (x1*x1 + y1*y1) <= 1.0 then do
-                        let (x',y') = (\(a,b) -> (round a, round b)) $ inverseFisheye (fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral size, (35/4), fromIntegral x, fromIntegral y)
-                        if x' >= imageWidth || x' < 0 || y' >= imageHeight || y' < 0 then
-                            writePixel mimg x y $ PixelRGB8 0 0 0
-                        else
-                            writePixel mimg x y $ pixelAt img x' y'
+                    let (x',y') = (\(a,b) -> (round a, round b)) $ equirecTofisheyeTransform (fromIntegral side, 1, fromIntegral imageHeight, fromIntegral imageWidth, fromIntegral x, fromIntegral y)
+                    if x' >= side || x' < 0 || y' >= side || y' < 0 then
+                        writePixel mimg 0 0 $ PixelRGB8 0 0 0
                     else
-                        writePixel mimg x y $ PixelRGB8 0 0 0
+                        writePixel mimg x' y' $ pixelAt img x y
                     go (x + 1) y
     go 0 0
+
 {-
 unFisheye :: Image PixelRGB8 -> Image PixelRGB8
 unFisheye img@Image {..} = runST $ do
@@ -161,7 +159,7 @@ rotateOrigin origin img = dynamicPixelMap (remapOrigin p) img
         p = findLambertOrigin (dynHeight img) (dynWidth img) origin
 
 remapOrigin :: Pixel a => PixelCoord -> Image a -> Image a
-remapOrigin (x_0, y_0) img@Image {..} = generateImage (\x y -> (\(x',y') -> pixelAt img x' y') $ wrapOrigin imageHeight imageWidth (x - x_0 + mx, y - y_0 + my)) imageWidth imageHeight
+remapOrigin (x_0, y_0) img@Image {..} = generateImage (\x y -> (\(x',y') -> pixelAt img x' y') $ wrapOrigin imageHeight imageWidth (x - x_0 + mx, y - y_0 - my)) imageWidth imageHeight
     where
         mx = div imageWidth 2
         my = div imageHeight 2

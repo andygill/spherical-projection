@@ -23,7 +23,7 @@ main = do
             (s . f) img
             where
                 t = case transform of
-                    "1" -> "inverseFisheyeTransform"
+                    "1" -> "equirecTofisheye"
                     "2" -> "unFisheye"
                     "3" -> "inversePanoToLittlePlanet"
                     "4" -> "panoToLittlePlanet"
@@ -39,7 +39,7 @@ main = do
                     "tga"   -> writeTga pathTo
                     _       -> error "Invalid extension"
                 f = case transform of
-                    "1" -> inverseFisheyeTransform . squareImage . convertRGB8
+                    "1" -> equirecTofisheye . convertRGB8 . rotateOrigin (0,-45)
                     "2" -> unFisheye . convertRGB8
                     "3" -> inversePanoToLittlePlanet . convertRGB8
                     "4" -> panoToLittlePlanet . convertRGB8

@@ -224,11 +224,11 @@ regenFunctions = outputCode' "./funcs.hs" "Funcs" HSKL [unFisheye, inverseFishey
 
 -- Same as above, but you can name the input variables
 regenFunctions' :: Language -> IO ()
-regenFunctions' lang = outputCode'' ("./funcs" ++ (langExt lang)) "Funcs" lang [unFisheye, inverseFisheye, sphere2planeStereo, lambertEq2CircTransform, lambertCirc2EqTransform]
+regenFunctions' lang = outputCode'' ("./funcs" ++ (langExt lang)) "Funcs" lang [unFisheye, equirecTofisheyeTransform, sphere2planeStereo, lambertEq2CircTransform, lambertCirc2EqTransform]
     where
 --        unFisheye = ("unFisheyeTransform", ["height", "width", "aperture", "x", "y"], (\ h w f x y _-> unnormalize' h w $ targetPtToFishImage f $ normalize'' h w (x,y)))
         unFisheye = ("unFisheyeTransform", ["height", "width", "x", "y"], (\ h w x y _ _-> spec_unnorm h w $ (\(px,py,pz) -> (Types.atan2 pz px, (Types.acos py) / (toRadian num_piS))) $ radToP3 $ spec_norm h w x y))
-        inverseFisheye = ("inverseFisheye", ["height", "width", "side", "aperture", "x", "y"], (\ h w s f x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ equiRecFisheyeToLongLat f $ normalize'' s s (x,y)))
+        equirecTofisheyeTransform = ("equirecTofisheyeTransform", ["side", "r", "height", "width", "x", "y"], (\ s r h w x y -> unnormalize' s s  $ rectilinearToCurvilinear r $ longLatToPoint $ (\(x',y') ->( scalarToLong $ x'*num_piS, scalarToLat $ y' * num_piS/2)) $ normalize'' h w (x,y)))
         sphere2planeStereo = ("sphere2planeStereo", ["phi", "theta"], (\ p t _ _ _ _ -> rectilinear2point2D $ fromSteroToRectilinear (0,0) (scalarToLong p, scalarToLat t)))
         --lambertTransform = ("lambertTransform", ["height", "width", "s", "x", "y"], (\ h w s x y _-> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ lambertFrom2DToSphere $ normalize'' s s (x,y)))
         lambertEq2CircTransform = ("lambertEq2CircTransform", ["height", "width", "side", "s", "x", "y"], (\ h w side s x y -> unnormalize' h w $ (\(x',y') ->((longToScalar x')/num_piS, (latToScalar y') * 2/num_piS)) $ lambertFrom2DToSphere $ lambertNorm side s (x,y)))
