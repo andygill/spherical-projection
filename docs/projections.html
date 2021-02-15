@@ -1,0 +1,17 @@
+---
+layout: page
+title: Projections
+permalink: /projections/
+usemathjax: true
+---
+This is a list of all the projections and their links
+<br>
+{%- for item in site.data.projection_list -%}
+<h2><a href="{{item.href | relative_url}}">{{item.title}}</a></h2>
+<ul>
+    {%- for x in item.sublinks -%}
+        <li><h3><a href="{{x.href | relative_url}}">{{x.title}}</a></h3></li>
+    {%- endfor -%}
+</ul>
+<br>
+{%- endfor -%}

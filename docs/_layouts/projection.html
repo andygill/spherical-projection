@@ -1,5 +1,7 @@
 ---
 layout: page
+usemathjax: true
+usethreejs: true
 ---
 {% assign projection = null %}
 {% for item in site.data.projections %}
@@ -9,38 +11,40 @@ layout: page
     {% endif %}
 {% endfor %}
 
-<h4> Projection Type: {{projection.type}}</h4>
-<br>
-<br>
+{% unless jekyll.environment == 'production' %}
+{{page.content}}
+{% endunless %}
+
 <h2> Background </h2>
-<br>
-{{projection.background}}
+{{page.background}}
 <br>
 <h2> Mathematics </h2>
+{{page.math_blurb}}
 <br>
-{{projection.math_blurb}}
-<br>
-<h2> Three.js Example </h2>
 
-{% include threejs_template.html %}
-{% comment %}
+<h2> Three.js Example </h2>
+<canvas id="c" width="80%" height="40%" style="border:1px solid #000000;"> did not load </canvas>
+
 <h2> Code Snippets </h2>
 <h3> Basic Mathematics Code </h3>
-{{projection.general_code.notes}}
-{% highlight javascript %}
-{% include {{projection.threejs.href}} %}
-{% endhighlight %}
+{% if page.general_code %}
+    {% highlight javascript %}
+    {% include {{page.general_code}} %}
+    {% endhighlight %}
+{% endif %}
 
-### Pixel-Based Mathematics Code
-{{projection.pixel_code.notes}}
-{% highlight javascript %}
-{% include {{projection.pixel_code.href}} %}
-{% endhighlight %}
+{% if page.pixel_code %}
+    <h3> Pixel-Based Mathematics Code </h3>
+    <p> visual notes </p>
+    {% highlight javascript %}
+    {% include {{page.pixel_code}} %}
+    {% endhighlight %}
+{% endif %}
 
-### Three.js Example Code
-{{projection.threejs.notes}}
-{% highlight javascript %}
-{% include {{projection.threejs.href}} %}
-{% endhighlight %}
-
-{% endcomment %}
+{% if page.threejs_code %}
+    <h3> Three.js Example Code </h3>
+    <p> visual notes </p>
+    {% highlight javascript %}
+    {% include {{page.threejs_code}} %}
+    {% endhighlight %}
+{% endif %}

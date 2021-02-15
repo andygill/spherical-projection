@@ -1,8 +1,8 @@
 - filename: stereographic
   title: Stereographic Projection
   link: /projections/stereographic
-  background:
-  math_blurb:
+  background: Blah blah blah
+  math_blurb: $$a^2 + b^2 = c^2 $$
 
 - filename: perspective
   title: Perspective Projection
@@ -15,9 +15,9 @@
   type: Area Preserving Stereographic
   link: /projections/equirectangular
   background:
-  math_blurb:
+  math_blurb: $$a^2 + b^2 = c^2 $$
   threejs:
-      - href:
+      - href:  /threejs/equirectangular.js
         notes:
   general_code:
       - href:
@@ -29,9 +29,9 @@
 - filename: lambert-ea-azimuthal
   title: Lambert Equal-Area Azimuthal Projection
   type: Area Preserving Stereographic
-  link: /projections/equirectangular
+  link: /projections/lambert-ea-azimuthal
   background:
-  math_blurb:
+  math_blurb:  $$a^2 + b^2 = c^2 $$
   threejs:
       - href: /threejs/lambert-ea-azimuthal.js
         notes:

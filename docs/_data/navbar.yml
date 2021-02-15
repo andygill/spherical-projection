@@ -3,17 +3,19 @@
 
 - title: Projections
   href: /projections/
-
-- title: Stereographic Projections
-  href: /projections/stereographic
   sublinks:
-  - title: Equirectangular
-    href: /projections/equirectangular
-  - title: Lambert Equal-Area Azimuthal
-    href: /projections/lamber-ea-azimuthal
+      - title: Stereographic Projections
+        href: /projections/stereographic
+        sublinks:
+        - title: Equirectangular
+          href: /projections/equirectangular
+        - title: Lambert Equal-Area Azimuthal
+          href: /projections/lambert-ea-azimuthal
+      - title: Perspective Projections
+        href: /projections/perspective
+        sublinks:
+        - title: Fisheye (Curvilinear)
+          href: /projections/perspective
 
-- title: Perspective Projections
-  href: /projections/perspective
-  sublinks:
-  - title: Fisheye
-    href: /projections/equirectangular
+- title: Code
+  href: /code/

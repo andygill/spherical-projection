@@ -1,0 +1,40 @@
+---
+layout: page
+filename: perspective
+title: Perspective Projections
+permalink: /projections/perspective/
+usemathjax: true
+usethreejs: true
+threejs_code: /threejs/perspective.js
+---
+
+<h2> Background </h2>
+<br>
+<h2> Mathematics </h2>
+Stereographic projections are invertible except at the point of projection, which is undefined.
+
+<h2> Three.js Example </h2>
+
+<canvas id="c" width="80%" height="40%" style="border:1px solid #000000;"> did not load </canvas>
+
+<h2> Code Snippets </h2>
+<h3> Basic Mathematics Code </h3>
+{% if page.general_code %}
+    {% highlight javascript %}
+    {% include {{page.general_code}} %}
+    {% endhighlight %}
+{% endif %}
+
+{% if page.pixel_code %}
+<h3> Pixel-Based Mathematics Code </h3>
+<p> visual notes </p>
+{% highlight javascript %}
+{% include {{page.pixel_code}} %}
+{% endhighlight %}
+{% endif %}
+
+<h3> Three.js Example Code </h3>
+<p> visual notes </p>
+{% highlight javascript %}
+{% include {{page.threejs_code}} %}
+{% endhighlight %}
