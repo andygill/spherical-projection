@@ -1,6 +1,6 @@
 - filename: stereographic
   title: Stereographic Projection
-  link: /projections/stereographic
+  link: "/projections/stereographic"
   background: Blah blah blah
   math_blurb: $$a^2 + b^2 = c^2 $$
 
@@ -13,9 +13,9 @@
 - filename: equirectangular
   title: Equirectangular Projection
   type: Area Preserving Stereographic
-  link: /projections/equirectangular
+  link: "/projections/equirectangular"
   background:
-  math_blurb: $$a^2 + b^2 = c^2 $$
+  math_blurb: "$$a^2 + b^2 = c^2 $$"
   threejs:
       - href:  /threejs/equirectangular.js
         notes:

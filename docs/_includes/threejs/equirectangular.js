@@ -1,19 +1,16 @@
 
 var scene = new THREE.Scene();
-var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
-
-const controls = new OrbitControls( camera, renderer.domElement );
-
-//controls.update() must be called after any manual changes to the camera's transform
-camera.position.set( 0, 20, 10 );
-controls.update();
+var camera = new THREE.PerspectiveCamera( 75, 800/400, 0.1, 1000 );
 
 var renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.setSize(800, 400);
 document.querySelector('#c').appendChild( renderer.domElement );
+//const controls = new OrbitControls( camera, renderer.domElement );
+
+//controls.update() must be called after any manual changes to the camera's transform
 
 var loader= new THREE.TextureLoader();
-var texture = loader.load("https://i.imgur.com/y9eyLnn.jpg");
+var texture = loader.load(window.location.origin + "/spherical-projection/assets/earth.jpg");
 const material = new THREE.MeshBasicMaterial({ map: texture });
 
 const sphereGeo = new THREE.SphereGeometry(1, 32, 32);
@@ -32,15 +29,15 @@ for (v in sphereCopy.geometry.vertices){
 }
 sphereCopy.geometry.setFromPoints(arr);
 sphereCopy.translateX(-2);
-scene.add(sphereCopy);*/
-
+scene.add(sphereCopy);
+*/
 const planeGeo = new THREE.PlaneGeometry(4, 2, 30, 30);
 const plane = new THREE.Mesh(planeGeo, material);
-plane.translateX(3);
+plane.translateX(4);
 scene.add(plane);
 console.log(plane);
 
-camera.position.z = 3;
+camera.position.set( 2, 0, 4 );
 
 var animate = function () {
 	requestAnimationFrame( animate );

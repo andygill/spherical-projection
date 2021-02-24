@@ -1,4 +1,9 @@
 
+
+var renderer = new THREE.WebGLRenderer();
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.querySelector('#c').appendChild( renderer.domElement );
+
 var scene = new THREE.Scene();
 var camera = new THREE.PerspectiveCamera( 75, window.innerWidth/window.innerHeight, 0.1, 1000 );
 
@@ -7,10 +12,6 @@ const controls = new OrbitControls( camera, renderer.domElement );
 //controls.update() must be called after any manual changes to the camera's transform
 camera.position.set( 0, 20, 10 );
 controls.update();
-
-var renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
-document.querySelector('#c').appendChild( renderer.domElement );
 
 var loader= new THREE.TextureLoader();
 var texture = loader.load("https://i.imgur.com/y9eyLnn.jpg");

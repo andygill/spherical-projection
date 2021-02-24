@@ -22,8 +22,10 @@ usethreejs: true
 {{page.math_blurb}}
 <br>
 
+{% if page.threejs_code %}
 <h2> Three.js Example </h2>
-<canvas id="c" width="80%" height="40%" style="border:1px solid #000000;"> did not load </canvas>
+<div id="c"></div>
+{% endif %}
 
 <h2> Code Snippets </h2>
 <h3> Basic Mathematics Code </h3>
@@ -47,4 +49,11 @@ usethreejs: true
     {% highlight javascript %}
     {% include {{page.threejs_code}} %}
     {% endhighlight %}
+{% endif %}
+
+{% if page.threejs_code %}
+    <script src="{{ "/assets/three.js" | relative_url }}" type="text/javascript"></script>
+    <script type="text/javascript">
+        {% include {{page.threejs_code}} %}
+    </script>
 {% endif %}
